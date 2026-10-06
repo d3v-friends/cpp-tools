@@ -1,5 +1,8 @@
 {
   "name": "cpp-tools",
   "version-string": "0.0.1",
-  "dependencies": ["gtest"]
+  "dependencies": [
+    "gtest",
+    "glm"
+  ]
 }
