@@ -21,3 +21,6 @@ latest:
     git tag "$TAG"
     git push --tags "$ORIGIN" "$TAG"
     printf "\n✅ %s 태그 작성완료!\n" "$TAG"
+
+@vcpkg:
+    just git tag $(jq -r '."version-string"' "vcpkg.json")

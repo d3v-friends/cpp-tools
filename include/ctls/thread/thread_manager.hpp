@@ -42,7 +42,7 @@ namespace ctls {
         bool stop(const std::string& name) {
             std::scoped_lock lock(m_mutex);
             const auto t = m_threads.extract(name);
-            if (!t.empty()) {
+            if (t.empty()) {
                 return false;
             }
 

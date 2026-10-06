@@ -5,8 +5,8 @@
 namespace ctls {
     class delta_time {
     public:
-        delta_time();
-        ~delta_time();
+        explicit delta_time() : m_tick(std::chrono::steady_clock::now()) {}
+        ~delta_time() = default;
         delta_time(const delta_time&) = delete;
         delta_time& operator=(const delta_time&) = delete;
         delta_time(delta_time&&) = delete;
