@@ -8,6 +8,9 @@
 #include "debug/assert.hpp"
 #include "debug/logger.hpp"
 
+// 파일 경로
+#include "filepath/filepath.hpp"
+
 // 기타 상수들
 #include "value/resolution.hpp"
 
