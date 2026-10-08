@@ -4,7 +4,7 @@
 #include <format>
 #include <chrono>
 
-namespace ctls::logger {
+namespace ctls {
     inline void print(std::string_view str) {
         const auto now =
             std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -19,4 +19,4 @@ namespace ctls::logger {
         // todo 이부분 변경하면 파일로 저장할수 있다. 필요시 확장하기
         std::fputs(line.c_str(), stderr);
     }
-} // namespace ctls::logger
+} // namespace ctls

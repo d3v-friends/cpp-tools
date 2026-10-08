@@ -4,7 +4,7 @@
 #include <format>
 #include <chrono>
 
-namespace ctls::logger {
+namespace ctls {
     inline void print(std::string_view str) {
         const auto now =
             std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -17,4 +17,4 @@ namespace ctls::logger {
         const auto line = std::format("{} {}\n", time_text, str);
         std::fputs(line.c_str(), stderr);
     }
-} // namespace ctls::logger
+} // namespace ctls
