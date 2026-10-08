@@ -7,6 +7,9 @@
 // container 관련
 #include "container/concurrency_vector.hpp"
 
+// crpyt 관련
+#include "crypto/uuid.hpp"
+
 // 디버그 도움 함수
 #include "debug/assert.hpp"
 #include "debug/logger.hpp"

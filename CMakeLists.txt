@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # find package
 find_package(glm CONFIG REQUIRED)
 
+
 # header only library
 add_library(ctls INTERFACE)
 add_library(ctls::ctls ALIAS ctls)
@@ -14,6 +15,11 @@ add_library(ctls::ctls ALIAS ctls)
 # include path
 target_include_directories(ctls INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(ctls INTERFACE glm::glm)
+
+# 윈도우에서 난수함수 라이브러리 추가
+if (WIN32)
+    target_link_libraries(ctls PRIVATE bcrypt)
+endif ()
 
 # 헤더파일 추가
 file(GLOB_RECURSE CTLS_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
@@ -23,6 +29,7 @@ target_sources(
         FILES ${CTLS_HEADERS}
 )
 target_compile_features(ctls INTERFACE cxx_std_20)
+
 
 
 # test
