@@ -70,13 +70,18 @@ namespace ctls {
             m_frame_budget = 1.0f / m_fps;
         }
 
+        void set_print_duration_milliseconds(const float duration) {
+            std::scoped_lock lock(m_mutex);
+            m_duration = duration;
+        }
+
     private:
         std::mutex m_mutex;
         std::vector<std::chrono::steady_clock::time_point> m_time_points;
         std::vector<std::string> m_keys;
         std::chrono::steady_clock::time_point m_start_at;
         std::chrono::steady_clock::time_point m_last_print_at;
-        float m_duration = 0;
+        float m_duration = 3000.0f;
         float m_fps = 60.0f;
         float m_frame_budget = 1.0f / m_fps;
 
