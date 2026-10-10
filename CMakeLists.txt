@@ -18,7 +18,7 @@ target_link_libraries(ctls INTERFACE glm::glm)
 
 # 윈도우에서 난수함수 라이브러리 추가
 if (WIN32)
-    target_link_libraries(ctls PRIVATE bcrypt)
+    target_link_libraries(ctls INTERFACE bcrypt)
 endif ()
 
 # 헤더파일 추가

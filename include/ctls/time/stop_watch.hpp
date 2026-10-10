@@ -64,6 +64,12 @@ namespace ctls {
             get_all_unlocked(out);
         }
 
+        void set_fps(const float fps) {
+            std::scoped_lock lock(m_mutex);
+            m_fps = fps;
+            m_frame_budget = 1.0f / m_fps;
+        }
+
     private:
         std::mutex m_mutex;
         std::vector<std::chrono::steady_clock::time_point> m_time_points;
