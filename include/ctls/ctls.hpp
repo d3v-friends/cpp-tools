@@ -4,6 +4,9 @@
 #include "cast/cast.hpp"
 #include "cast/enum.hpp"
 
+// concurrency
+#include "concurrency/channel.hpp"
+
 // container 관련
 #include "container/concurrency_vector.hpp"
 
