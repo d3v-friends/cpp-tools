@@ -6,6 +6,7 @@
 
 // concurrency
 #include "concurrency/channel.hpp"
+#include "concurrency/tps_channel.hpp"
 
 // container 관련
 #include "container/concurrency_vector.hpp"

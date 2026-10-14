@@ -2,7 +2,7 @@
 
 #include <thread>
 #include <mutex>
-#include <unordered_map>
+#include <map>
 #include <memory>
 #include <atomic>
 #include <string>
@@ -26,29 +26,33 @@ namespace ctls {
         thread_manager& operator=(thread_manager&&) = delete;
 
         void stop_all() {
-            m_is_terminated.store(true);
-            std::scoped_lock lock(m_mutex);
-            m_stop_source.request_stop();
-            m_threads.clear();
+            _is_terminated.store(true);
+            std::scoped_lock lock(_mutex);
+            _stop_source.request_stop();
+            _threads.clear();
         }
 
-        std::stop_token token() const { return m_stop_source.get_token(); }
+        std::stop_token token() const { return _stop_source.get_token(); }
 
         bool check_running(const std::string& name) {
-            std::scoped_lock lock(m_mutex);
+            std::scoped_lock lock(_mutex);
             return check_running_unlocked(name);
         }
 
         bool stop(const std::string& name) {
-            std::scoped_lock lock(m_mutex);
-            const auto t = m_threads.extract(name);
-            if (t.empty()) {
+            decltype(_threads)::node_type node;
+            {
+                std::scoped_lock lock(_mutex);
+                node = _threads.extract(name);
+            }
+
+            if (node.empty()) {
                 return false;
             }
 
-            if (auto thread = std::move(t.mapped()); thread.joinable()) {
-                thread.request_stop();
-                thread.join();
+            if (auto& task = node.mapped(); task.joinable()) {
+                task.request_stop();
+                task.join();
             }
 
             return true;
@@ -62,19 +66,19 @@ namespace ctls {
                 return false;
             }
 
-            if (m_is_terminated.load()) [[unlikely]] {
+            if (_is_terminated.load()) [[unlikely]] {
                 I_LOG("thread_manager is terminated");
                 return false;
             }
 
-            std::scoped_lock lock(m_mutex);
+            std::scoped_lock lock(_mutex);
             if (check_running_unlocked(name)) {
                 return false;
             }
 
             const auto is_done = std::make_shared<std::atomic<bool>>(false);
             auto t = thread_task{
-                std::jthread([global = m_stop_source.get_token(), fn = std::move(fn),
+                std::jthread([global = _stop_source.get_token(), fn = std::move(fn),
                               is_done](const std::stop_token& own) mutable {
                     // 두개의 stop 신호 정보 합치기
                     std::stop_source merged;
@@ -97,22 +101,22 @@ namespace ctls {
                 is_done};
 
             // 추가 실패시 스레드 종료하고 실패로 결과값 리턴
-            return m_threads.try_emplace(name, std::move(t)).second;
+            return _threads.try_emplace(name, std::move(t)).second;
         }
 
     private:
-        mutable std::mutex m_mutex;
-        std::unordered_map<std::string, thread_task> m_threads{};
-        std::stop_source m_stop_source;
-        std::atomic<bool> m_is_terminated{false};
+        mutable std::mutex _mutex;
+        std::map<std::string, thread_task> _threads{};
+        std::stop_source _stop_source;
+        std::atomic<bool> _is_terminated{false};
 
         bool check_running_unlocked(const std::string& name) {
-            if (const auto task = m_threads.find(name); task != m_threads.end()) {
+            if (const auto task = _threads.find(name); task != _threads.end()) {
                 // 작동중이면 true
                 if (!task->second.get_is_done()) {
                     return true;
                 }
-                m_threads.erase(task);
+                _threads.erase(task);
             }
             return false;
         }

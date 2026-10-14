@@ -14,22 +14,22 @@ namespace ctls {
         ~concurrency_vector() = default;
 
         void reserve(std::size_t size) {
-            std::scoped_lock lock(m_mutex);
-            m_data.reserve(size);
+            std::scoped_lock lock(_mutex);
+            _data.reserve(size);
         }
 
         void push_back(T value) {
-            std::scoped_lock lock(m_mutex);
-            m_data.push_back(std::move(value));
+            std::scoped_lock lock(_mutex);
+            _data.push_back(std::move(value));
         }
 
         std::vector<T> get_data() const {
-            std::scoped_lock lock(m_mutex);
-            return m_data;
+            std::scoped_lock lock(_mutex);
+            return _data;
         }
 
     private:
-        mutable std::mutex m_mutex;
-        std::vector<T> m_data;
+        mutable std::mutex _mutex;
+        std::vector<T> _data;
     };
 } // namespace ctls

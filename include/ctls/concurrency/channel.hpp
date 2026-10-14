@@ -7,21 +7,19 @@
 #include <utility>
 #include <cstdint>
 
+#include "types.hpp"
 namespace ctls {
-
-    enum class e_channel_status : std::uint8_t {
-        ok,     // 값 있음
-        empty,  // 아직 안 닫혔는데 비어 있음
-        closed, // 닫혔고 남은 것도 없음
-    };
 
     // go 의 chan 과 비슷하게 동작하는 스레드 안전 큐
     // capacity == 0 이면 크기 제한 없음
     template <class T> class channel {
     public:
         explicit channel(const std::size_t capacity = 0) : _capacity{capacity} {}
+        ~channel() = default;
         channel(const channel&) = delete;
         channel& operator=(const channel&) = delete;
+        channel(channel&&) = delete;
+        channel& operator=(channel&&) = delete;
 
         // ch <- value. 가득 차 있으면 자리가 날 때까지 기다림. 닫혀 있으면 false
         bool send(T value) {
