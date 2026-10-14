@@ -11,14 +11,14 @@ TEST(String, to_int) {
 
 TEST(String, str_split) {
     bool result =
-        ctls::str_split("a,b,c", ',') == std::vector<std::string>{"a", "b", "c"};
+        ctls::str_split("a,b,c", ",") == std::vector<std::string>{"a", "b", "c"};
     EXPECT_TRUE(result);
 
     result =
-        ctls::str_split("a,b,c,", ',') == std::vector<std::string>{"a", "b", "c", ""};
+        ctls::str_split("a,b,c,", ",") == std::vector<std::string>{"a", "b", "c", ""};
     EXPECT_TRUE(result);
 
-    result = ctls::str_split("a,b,c,,", ',') ==
+    result = ctls::str_split("a,b,c,,", ",") ==
              std::vector<std::string>{"a", "b", "c", "", ""};
     EXPECT_TRUE(result);
 }

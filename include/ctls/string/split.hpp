@@ -1,21 +1,27 @@
 #pragma once
 
-#include <sstream>
 #include <string>
 #include <vector>
 
 namespace ctls {
-    inline std::vector<std::string> str_split(const std::string& s, const char delim) {
+
+    inline std::vector<std::string>
+    str_split(std::string_view s, const std::string_view delim) {
         std::vector<std::string> out;
-        std::istringstream iss(s);
-        std::string token;
-        while (std::getline(iss, token, delim)) {
-            out.push_back(token);
+
+        if (delim.empty()) {
+            out.emplace_back(s); // push_back → emplace_back
+            return out;
         }
 
-        if (s.empty() || s.back() == delim) {
-            out.emplace_back();
+        size_t start = 0;
+        size_t pos;
+        while ((pos = s.find(delim, start)) != std::string_view::npos) {
+            out.emplace_back(s.substr(start, pos - start)); // push_back → emplace_back
+            start = pos + delim.size();
         }
+        out.emplace_back(s.substr(start)); // push_back → emplace_back
+
         return out;
     }
 
