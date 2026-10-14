@@ -8,3 +8,17 @@ TEST(String, to_int) {
     EXPECT_TRUE(ctls::to_int("123") == 123);
     EXPECT_TRUE(ctls::to_string(123.5) == "123.5");
 }
+
+TEST(String, str_split) {
+    bool result =
+        ctls::str_split("a,b,c", ',') == std::vector<std::string>{"a", "b", "c"};
+    EXPECT_TRUE(result);
+
+    result =
+        ctls::str_split("a,b,c,", ',') == std::vector<std::string>{"a", "b", "c", ""};
+    EXPECT_TRUE(result);
+
+    result = ctls::str_split("a,b,c,,", ',') ==
+             std::vector<std::string>{"a", "b", "c", "", ""};
+    EXPECT_TRUE(result);
+}

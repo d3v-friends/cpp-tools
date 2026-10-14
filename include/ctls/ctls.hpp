@@ -28,6 +28,7 @@
 
 // string
 #include "string/string.hpp"
+#include "string/split.hpp"
 
 // thread 관련
 #include "thread/thread_task.hpp"
