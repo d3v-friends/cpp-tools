@@ -56,13 +56,15 @@ namespace ctls {
             std::unique_lock lock{_mutex};
             _not_empty.wait(lock, [this] { return _is_closed || !_queue.empty(); });
             if (_queue.empty()) {
-                return std::nullopt;                       // 닫히고 비었으면 바로 종료
+                return std::nullopt; // 닫히고 비었으면 바로 종료
             }
 
             // 꺼낼 시각을 lock 안에서 예약
             const auto now = std::chrono::steady_clock::now();
             auto next = _last_pop_at + interval_unlocked();
-            if (next < now) next = now;
+            if (next < now) {
+                next = now;
+            }
             _last_pop_at = next;
 
             T value = std::move(_queue.front());
@@ -78,15 +80,18 @@ namespace ctls {
         std::pair<e_channel_status, std::optional<T>> try_receive() {
             std::unique_lock lock{_mutex};
             if (_queue.empty()) {
-                return {_is_closed ? e_channel_status::closed : e_channel_status::empty, std::nullopt};
+                return {
+                    _is_closed ? e_channel_status::closed : e_channel_status::empty,
+                    std::nullopt};
             }
 
             const auto now = std::chrono::steady_clock::now();
             if (now < _last_pop_at + interval_unlocked()) {
-                return {e_channel_status::wait, std::nullopt};   // 값은 있는데 아직 시간 안 됨
+                return {
+                    e_channel_status::wait, std::nullopt}; // 값은 있는데 아직 시간 안 됨
             }
 
-            _last_pop_at = now;                                   // 갱신
+            _last_pop_at = now; // 갱신
             T value = std::move(_queue.front());
             _queue.pop_front();
             lock.unlock();
@@ -107,6 +112,16 @@ namespace ctls {
         [[nodiscard]] bool is_closed() const {
             std::scoped_lock lock{_mutex};
             return _is_closed;
+        }
+
+        [[nodiscard]] std::size_t size() const {
+            std::scoped_lock lock{_mutex};
+            return _queue.size();
+        }
+
+        [[nodiscard]] bool empty() const {
+            std::scoped_lock lock{_mutex};
+            return _queue.empty();
         }
 
     private:

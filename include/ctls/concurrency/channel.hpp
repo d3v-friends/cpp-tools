@@ -69,6 +69,16 @@ namespace ctls {
             return _is_closed;
         }
 
+        [[nodiscard]] std::size_t size() const {
+            std::scoped_lock lock{_mutex};
+            return _queue.size();
+        }
+
+        [[nodiscard]] bool empty() const {
+            std::scoped_lock lock{_mutex};
+            return _queue.empty();
+        }
+
     private:
         mutable std::mutex _mutex;
         std::condition_variable _not_empty;
