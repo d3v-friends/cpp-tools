@@ -1,8 +1,9 @@
 #pragma once
 
 #include <atomic>
-#include <thread>
 #include <memory>
+#include <thread>
+#include <utility>
 
 namespace ctls {
     class thread_task {
@@ -21,11 +22,17 @@ namespace ctls {
 
         [[nodiscard]] bool get_is_done() const { return _is_done->load(); }
 
-        std::jthread& get_thread() { return _thread; }
-
         [[nodiscard]] bool joinable() const { return _thread.joinable(); }
 
+        // 지금 이 코드를 실행 중인 스레드가 이 task의 스레드인지
+        [[nodiscard]] bool is_current_thread() const noexcept {
+            return _thread.get_id() == std::this_thread::get_id();
+        }
+
         void join() { _thread.join(); }
+
+        // 자기 자신을 join할 수 없을 때(스레드 안에서 정리하는 경우)만 사용
+        void detach() { _thread.detach(); }
 
         bool request_stop() { return _thread.request_stop(); }
 
@@ -33,4 +40,4 @@ namespace ctls {
         std::jthread _thread;
         std::shared_ptr<std::atomic<bool>> _is_done;
     };
-} // namespace ctls::thread
+} // namespace ctls
