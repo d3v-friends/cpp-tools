@@ -111,7 +111,11 @@ namespace ctls {
         }
 
         // 항상 신규 등록. 실패하면 0 반환.
-        std::uint64_t run(std::function<void(std::stop_token)> fn) {
+        // on_done 쓰레드가 종료되고 실행되는 함수. 파라미터는 등록된 쓰레드 아이디.
+        // 쓰레드에서 예외가 발생해도 실행된다.
+        std::uint64_t
+        run(std::function<void(std::stop_token)> fn,
+            std::function<void(std::uint64_t thread_id)> on_done = nullptr) {
             if (!fn) [[unlikely]] {
                 ILOG_ERROR("fn is nullptr");
                 return 0;
@@ -138,25 +142,37 @@ namespace ctls {
             _threads.emplace(
                 _thread_id,
                 thread_task{
-                    std::jthread([global = _stop_source.get_token(), fn = std::move(fn),
-                                  is_done](const std::stop_token& own) mutable {
-                        // 두 개의 stop 신호 합치기
-                        std::stop_source merged;
-                        std::stop_callback on_global(
-                            global, [&merged] { merged.request_stop(); });
-                        std::stop_callback on_own(
-                            own, [&merged] { merged.request_stop(); });
+                    std::jthread(
+                        [global = _stop_source.get_token(), fn = std::move(fn), is_done,
+                         on_done = std::move(on_done),
+                         thread_id = _thread_id](const std::stop_token& own) mutable {
+                            // 두 개의 stop 신호 합치기
+                            std::stop_source merged;
+                            std::stop_callback on_global(
+                                global, [&merged] { merged.request_stop(); });
+                            std::stop_callback on_own(
+                                own, [&merged] { merged.request_stop(); });
 
-                        try {
-                            fn(merged.get_token());
-                        } catch (const std::exception& err) {
-                            ILOG_ERROR("err: error={}", err.what());
-                        } catch (...) {
-                            ILOG_ERROR("error");
-                        }
+                            try {
+                                fn(merged.get_token());
+                            } catch (const std::exception& err) {
+                                ILOG_ERROR("err: error={}", err.what());
+                            } catch (...) {
+                                ILOG_ERROR("error");
+                            }
 
-                        is_done->store(true);
-                    }),
+                            try {
+                                if (on_done != nullptr) {
+                                    on_done(thread_id);
+                                }
+                            } catch (const std::exception& err) {
+                                ILOG_ERROR("on_done error: error={}", err.what());
+                            } catch (...) {
+                                ILOG_ERROR("on_done error");
+                            }
+
+                            is_done->store(true);
+                        }),
                     is_done});
 
             return _thread_id;
