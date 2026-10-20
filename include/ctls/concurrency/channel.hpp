@@ -64,7 +64,7 @@ namespace ctls {
             _not_full.notify_all();
         }
 
-        std::size_t flush() {
+        std::size_t drain() {
             std::deque<T> drained;
             {
                 std::scoped_lock lock{_mutex};

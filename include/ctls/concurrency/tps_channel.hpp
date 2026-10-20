@@ -124,7 +124,7 @@ namespace ctls {
             return _queue.empty();
         }
 
-        std::size_t flush() {
+        std::size_t drain() {
             std::deque<T> drained;
             {
                 std::scoped_lock lock{_mutex};
