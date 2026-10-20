@@ -124,6 +124,18 @@ namespace ctls {
             return _queue.empty();
         }
 
+        std::size_t flush() {
+            std::deque<T> drained;
+            {
+                std::scoped_lock lock{_mutex};
+                drained.swap(_queue);
+                _is_closed = true;
+            }
+            _not_empty.notify_all();
+            _not_full.notify_all();
+            return drained.size(); // drained는 락 밖에서 소멸
+        }
+
     private:
         mutable std::mutex _mutex;
         std::condition_variable _not_empty;

@@ -64,6 +64,18 @@ namespace ctls {
             _not_full.notify_all();
         }
 
+        std::size_t flush() {
+            std::deque<T> drained;
+            {
+                std::scoped_lock lock{_mutex};
+                drained.swap(_queue);
+                _is_closed = true;
+            }
+            _not_empty.notify_all();
+            _not_full.notify_all();
+            return drained.size(); // drained는 락 밖에서 소멸
+        }
+
         [[nodiscard]] bool is_closed() const {
             std::scoped_lock lock{_mutex};
             return _is_closed;
