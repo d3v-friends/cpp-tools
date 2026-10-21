@@ -7,8 +7,10 @@
 namespace ctls {
     // 모두 기다렸을떄 true
     // 미리 깨어났을때 false => 토큰이 만료됨. 스레드 종료신호
-    inline bool
-    wait_thread(const std::stop_token& own, const std::chrono::milliseconds wait) {
+    template <class Rep, class Period>
+    bool wait_thread(
+        const std::stop_token& own,
+        const std::chrono::duration<Rep, Period>& wait) {
         std::mutex m;
         std::condition_variable_any cv;
         std::unique_lock lock{m};
