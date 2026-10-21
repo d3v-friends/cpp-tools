@@ -34,6 +34,7 @@
 // thread 관련
 #include "thread/thread_task.hpp"
 #include "thread/thread_manager.hpp"
+#include "thread/wait.hpp"
 
 // time 관련 함수
 #include "time/diff.hpp"
