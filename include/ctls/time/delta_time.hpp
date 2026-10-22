@@ -1,6 +1,9 @@
 #pragma once
 #include <chrono>
 #include <mutex>
+#include <thread>
+#include <algorithm>
+
 #include "ctls/debug/assert.hpp"
 
 namespace ctls {

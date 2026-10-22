@@ -9,7 +9,7 @@ namespace ctls {
         std::string digits;
         digits.reserve(str.size());
         for (const char c : str) {
-            if ('0' <= c && c <= '9') {
+            if ('0' <= c && c <= '9' || c == '-') {
                 digits.push_back(c);
             }
         }

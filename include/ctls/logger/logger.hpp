@@ -3,6 +3,9 @@
 #include <ctime>
 #include <format>
 #include <chrono>
+#include <cstdio>
+#include <string>
+#include <iterator>
 
 namespace ctls {
     inline void print(std::string_view str) {

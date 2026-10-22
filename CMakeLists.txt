@@ -19,6 +19,7 @@ target_link_libraries(ctls INTERFACE glm::glm)
 # 윈도우에서 난수함수 라이브러리 추가
 if (WIN32)
     target_link_libraries(ctls INTERFACE bcrypt)
+    target_compile_definitions(ctls INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif ()
 
 # 헤더파일 추가

@@ -6,7 +6,7 @@
 TEST(Crypto, UUID) {
     auto uuid = ctls::make_secure_uuid_v4();
     if (uuid.has_value()) {
-        I_LOG_F("uuid={}", uuid.value());
+        ILOG_INFO("uuid={}", uuid.value());
         EXPECT_TRUE(true);
     } else {
         EXPECT_TRUE(false);

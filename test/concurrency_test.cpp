@@ -69,7 +69,7 @@ TEST(TpsChannel, ReceiveRespectsTps) {
 
     const double elapsed = elapsed_ms(start);
     const double expected = (count - 1) * interval_ms;
-    I_LOG_F("elapsed={}ms expected={}ms", elapsed, expected);
+    ILOG_TRACE("elapsed={}ms expected={}ms", elapsed, expected);
     EXPECT_GE(elapsed, expected * 0.9);
     EXPECT_LT(elapsed, expected * 1.5);
 }
@@ -227,7 +227,7 @@ TEST(TpsChannel, MultipleConsumersRespectTps) {
 
     const double elapsed = elapsed_ms(times.front(), times.back());
     const double expected = (count - 1) * interval_ms;
-    I_LOG_F("consumers=3 elapsed={}ms expected={}ms", elapsed, expected);
+    ILOG_INFO("consumers=3 elapsed={}ms expected={}ms", elapsed, expected);
     EXPECT_GE(elapsed, expected * 0.9);
 }
 
@@ -245,7 +245,7 @@ TEST(TpsChannel, SetTpsChangesRate) {
     }
 
     const double elapsed = elapsed_ms(start);
-    I_LOG_F("elapsed={}ms", elapsed);
+    ILOG_INFO("elapsed={}ms", elapsed);
     EXPECT_GE(elapsed, 150.0 * 0.9);
 }
 

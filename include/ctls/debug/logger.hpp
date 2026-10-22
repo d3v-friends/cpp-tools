@@ -66,15 +66,6 @@ namespace ctls {
 
 } // namespace ctls
 
-// deprecated
-#ifdef NDEBUG
-#define I_LOG(str) ((void)0)
-#define I_LOG_F(fmt, ...) ((void)0)
-#else
-#define I_LOG(str) ctls::print_line(std::source_location::current(), str)
-#define I_LOG_F(fmt, ...)                                                                \
-    ctls::printf_line(std::source_location::current(), fmt __VA_OPT__(, ) __VA_ARGS__)
-#endif
 
 #define ILOG(level, ...)                                                                 \
     ::ctls::print_log((level), std::source_location::current(), __VA_ARGS__)

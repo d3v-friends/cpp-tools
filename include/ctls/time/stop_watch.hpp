@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <format>
 
 #include "diff.hpp"
 #include "ctls/debug/logger.hpp"
@@ -13,7 +14,7 @@ namespace ctls {
     public:
         explicit stop_watch()
             : _start_at(std::chrono::steady_clock::now()),
-              _last_print_at(std::chrono::steady_clock::now()) {}
+              _last_print_at(std::chrono::steady_clock::now()), _time_points{_start_at} {}
 
         ~stop_watch() = default;
         stop_watch(const stop_watch&) = delete;
@@ -54,12 +55,12 @@ namespace ctls {
                 log += std::format(", {}={:5f}", key, time);
             }
 
-            I_LOG_F("fps={:1f}, budget={:5f}{}", _fps, _frame_budget, log);
+            ILOG_TRACE("fps={:1f}, budget={:5f}{}", _fps, _frame_budget, log);
 
             _last_print_at = _start_at;
         }
 
-        void get_all(std::unordered_map<std::string, float>& out) {
+        void get_all(std::unordered_map<std::string, float>& out) const {
             std::scoped_lock lock(_mutex);
             get_all_unlocked(out);
         }
@@ -77,10 +78,10 @@ namespace ctls {
 
     private:
         mutable std::mutex _mutex;
-        std::vector<std::chrono::steady_clock::time_point> _time_points;
         std::vector<std::string> _keys;
         std::chrono::steady_clock::time_point _start_at;
         std::chrono::steady_clock::time_point _last_print_at;
+        std::vector<std::chrono::steady_clock::time_point> _time_points;
         float _duration = 3000.0f;
         float _fps = 60.0f;
         float _frame_budget = 1.0f / _fps;
