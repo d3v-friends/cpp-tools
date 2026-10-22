@@ -17,6 +17,7 @@
 // 디버그 도움 함수
 #include "debug/assert.hpp"
 #include "debug/logger.hpp"
+#include "debug/p_logger.hpp"
 
 // 환경변수
 #include "ctls/env/env.hpp"

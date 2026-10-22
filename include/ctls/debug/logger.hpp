@@ -9,6 +9,7 @@
 #include <iterator>
 
 #include "ctls/logger/logger.hpp"
+#include "types.hpp"
 
 namespace ctls {
     inline void print_line(const std::source_location& loc, std::string_view str) {
@@ -34,49 +35,7 @@ namespace ctls {
         print(std::format(fmt, std::forward<ARGS>(args)...));
     }
 
-    enum class e_log_level : std::uint8_t {
-        e_trace,
-        e_debug,
-        e_info,
-        e_warning,
-        e_error,
-    };
 
-    inline std::string_view to_string_e_log_level(const e_log_level level) {
-        switch (level) {
-        case e_log_level::e_trace:
-            return "[TRACE]";
-        case e_log_level::e_debug:
-            return "[DEBUG]";
-        case e_log_level::e_info:
-            return "[INFO_]";
-        case e_log_level::e_warning:
-            return "[WARN_]";
-        case e_log_level::e_error:
-            return "[ERROR]";
-        default:
-            return "[_____]";
-        }
-    }
-
-    inline std::string_view to_color_e_log_level(const e_log_level level) {
-        switch (level) {
-        case e_log_level::e_trace:
-            return "\033[90m";
-        case e_log_level::e_debug:
-            return "\033[36m";
-        case e_log_level::e_info:
-            return "\033[32m";
-        case e_log_level::e_warning:
-            return "\033[33m";
-        case e_log_level::e_error:
-            return "\033[31m";
-        default:
-            return "";
-        }
-    }
-
-    inline constexpr std::string_view k_color_reset = "\033[0m";
 
     template <typename... ARGS>
     void print_log(
@@ -98,7 +57,7 @@ namespace ctls {
         message.reserve(192);
         std::format_to(
             std::back_inserter(message), "{}[{:04x}] ", // 끝에 공백
-            to_string_e_log_level(level), thread_tag);
+            to_string(level), thread_tag);
         std::format_to(std::back_inserter(message), fmt, std::forward<ARGS>(args)...);
         std::format_to(
             std::back_inserter(message), "\t\t({} ({}))", filename, location.line());
@@ -125,10 +84,10 @@ namespace ctls {
 #define ILOG_DEBUG(...) ((void)0)
 #define ILOG_INFO(...) ((void)0)
 #else
-#define ILOG_TRACE(...) ILOG(::ctls::e_log_level::e_trace, __VA_ARGS__)
-#define ILOG_DEBUG(...) ILOG(::ctls::e_log_level::e_debug, __VA_ARGS__)
-#define ILOG_INFO(...) ILOG(::ctls::e_log_level::e_info, __VA_ARGS__)
+#define ILOG_TRACE(...) ILOG(::ctls::e_log_level::trace, __VA_ARGS__)
+#define ILOG_DEBUG(...) ILOG(::ctls::e_log_level::debug, __VA_ARGS__)
+#define ILOG_INFO(...) ILOG(::ctls::e_log_level::info, __VA_ARGS__)
 #endif
 
-#define ILOG_WARN(...) ILOG(::ctls::e_log_level::e_warning, __VA_ARGS__)
-#define ILOG_ERROR(...) ILOG(::ctls::e_log_level::e_error, __VA_ARGS__)
+#define ILOG_WARN(...) ILOG(::ctls::e_log_level::warning, __VA_ARGS__)
+#define ILOG_ERROR(...) ILOG(::ctls::e_log_level::error, __VA_ARGS__)
