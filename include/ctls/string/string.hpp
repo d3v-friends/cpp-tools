@@ -1,5 +1,9 @@
 #pragma once
 #include <optional>
+#include <algorithm>
+#include <cctype>
+#include <string>
+
 namespace ctls {
     inline std::optional<int> to_int(const std::string& str) {
         std::string digits;
@@ -30,6 +34,13 @@ namespace ctls {
             return {};
         }
         return {buffer.data(), ptr};
+    }
+
+    inline std::string to_lower(std::string s) { // 값으로 받아서 복사본을 바꿔 반환
+        std::ranges::transform(s, s.begin(), [](const unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return s;
     }
 
 } // namespace ctls
