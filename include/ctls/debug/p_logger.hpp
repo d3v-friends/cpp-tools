@@ -139,15 +139,8 @@ namespace ctls {
 #define PLOG(level, ...)                                                                 \
     ::ctls::p_logger::print(level, std::source_location::current(), __VA_ARGS__)
 
-#ifdef NDEBUG
-// #define PLOG_TRACE(...) ((void)0)
-// #define PLOG_DEBUG(...) ((void)0)
-// #define PLOG_INFO(...) ((void)0)
-#else
 #define PLOG_TRACE(...) PLOG(::ctls::e_log_level::trace, __VA_ARGS__)
 #define PLOG_DEBUG(...) PLOG(::ctls::e_log_level::debug, __VA_ARGS__)
 #define PLOG_INFO(...) PLOG(::ctls::e_log_level::info, __VA_ARGS__)
-#endif
-
 #define PLOG_WARN(...) PLOG(::ctls::e_log_level::warning, __VA_ARGS__)
 #define PLOG_ERROR(...) PLOG(::ctls::e_log_level::error, __VA_ARGS__)
