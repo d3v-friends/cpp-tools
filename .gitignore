@@ -10,8 +10,8 @@
 .DS_Store
 
 # cmake
-cmake-build-debug
-cmake-*/
+CMakeUserPresets.json
+/build/
 
 # vcpkg
 vcpkg_installed

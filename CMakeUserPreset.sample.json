@@ -1,0 +1,22 @@
+{
+  "version": 8,
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "configurePresets": [
+    {
+      "name": "mac-debug",
+      "inherits": "debug",
+      "environment": {
+        "VCPKG_ROOT": "[위치]/sdk/cpp/vcpkg",
+        "VULKAN_SDK": "[위치]/sdk/vulkan/1_4_357_1"
+      }
+    },
+    {
+      "name": "mac-release",
+      "inherits": "release",
+      "environment": {
+        "VCPKG_ROOT": "[위치]/sdk/cpp/vcpkg",
+        "VULKAN_SDK": "[위치]/sdk/vulkan/1_4_357_1"
+      }
+    }
+  ]
+}
