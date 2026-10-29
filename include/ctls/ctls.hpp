@@ -41,6 +41,7 @@
 #include "time/diff.hpp"
 #include "time/delta_time.hpp"
 #include "time/stop_watch.hpp"
+#include "time/rfc3339.hpp"
 
 // 기타 상수들
 #include "value/resolution.hpp"
