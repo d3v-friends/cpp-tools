@@ -5,9 +5,10 @@
 #include <mutex>
 #include <optional>
 #include <utility>
-#include <cstdint>
+#include <vector>
 
 #include "types.hpp"
+#include "ctls/debug/logger.hpp"
 namespace ctls {
 
     // go 의 chan 과 비슷하게 동작하는 스레드 안전 큐
@@ -39,6 +40,27 @@ namespace ctls {
             std::unique_lock lock{_mutex};
             _not_empty.wait(lock, [this] { return _is_closed || !_queue.empty(); });
             return pop_unlocked(lock);
+        }
+
+        std::vector<T> receive(std::size_t size) {
+            std::vector<T> res;
+            res.reserve(size);
+            {
+                std::unique_lock lock{_mutex};
+                while (res.size() < size) {
+                    _not_empty.wait(
+                        lock, [this] { return _is_closed || !_queue.empty(); });
+                    if (_queue.empty()) { // closed && empty
+                        break;
+                    }
+                    res.push_back(std::move(_queue.front()));
+                    _queue.pop_front();
+                    _not_full
+                        .notify_one(); // 락 안에서 notify 해도 OK (블로킹 send 깨우기)
+                }
+            }
+            _not_full.notify_all();
+            return res;
         }
 
         // select { case v := <-ch: ... default: ... }
