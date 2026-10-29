@@ -9,7 +9,7 @@
 namespace ctls {
     class rfc3339 {
     public:
-        explicit rfc3339()
+        rfc3339()
             : _now{std::chrono::system_clock::now()},
               _string{std::format(
                   "{:%FT%TZ}",
