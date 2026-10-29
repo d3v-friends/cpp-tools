@@ -5,6 +5,7 @@
 #include <charconv>
 #include <optional>
 #include <string_view>
+#include <ctime>
 
 namespace ctls {
     class rfc3339 {
@@ -46,6 +47,20 @@ namespace ctls {
             return _string;
         }
 
+        [[nodiscard]] std::optional<std::string> local_string() const {
+            using namespace std::chrono;
+            if (!_is_valid) {
+                return std::nullopt;
+            }
+            const auto sec = floor<seconds>(_now); // ms 버림
+            const auto off = utc_offset(system_clock::to_time_t(sec));
+            if (!off) {
+                return std::nullopt;
+            }
+            const local_seconds local{sec.time_since_epoch() + *off};
+            return std::format("{:%FT%T}", local); // 초 단위라 소수부 안 붙음
+        }
+
         static rfc3339 from_string(const std::string& str) { return rfc3339{str}; }
 
         [[nodiscard]] std::optional<std::string> string() const {
@@ -67,6 +82,27 @@ namespace ctls {
         std::chrono::system_clock::time_point _now;
         std::string _string;
         bool _is_valid;
+
+        [[nodiscard]] static std::optional<std::chrono::seconds>
+        utc_offset(const std::time_t t) noexcept {
+            std::tm tm{};
+#if defined(_WIN32)
+            if (localtime_s(&tm, &t) != 0) {
+                return std::nullopt;
+            }
+            std::tm gm{};
+            if (gmtime_s(&gm, &t) != 0) {
+                return std::nullopt;
+            }
+            gm.tm_isdst = tm.tm_isdst; // mktime 이 DST 보정 안 하게
+            return std::chrono::seconds{static_cast<long long>(t - std::mktime(&gm))};
+#else
+            if (localtime_r(&t, &tm) == nullptr) {
+                return std::nullopt;
+            }
+            return std::chrono::seconds{tm.tm_gmtoff};
+#endif
+        }
 
         [[nodiscard]] static std::optional<std::chrono::system_clock::time_point>
         parse(const std::string_view s) noexcept {
