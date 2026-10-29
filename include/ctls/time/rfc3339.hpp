@@ -50,6 +50,16 @@ namespace ctls {
             return ceil<minutes>(time._now - system_clock::now()).count();
         }
 
+        // 함수를 실행한 시각 기준으로 남은 분
+        // 양수: 기다려야 함, 0 이하: 이미 지남, nullopt: 무효 객체
+        [[nodiscard]] static std::optional<long long> diff_seconds(const rfc3339& time) {
+            using namespace std::chrono;
+            if (!time._is_valid) {
+                return std::nullopt;
+            }
+            return ceil<seconds>(time._now - system_clock::now()).count();
+        }
+
         [[nodiscard]] std::string to_string() const {
             if (!_is_valid) {
                 return "";
