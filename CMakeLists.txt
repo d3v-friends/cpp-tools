@@ -1,12 +1,30 @@
 cmake_minimum_required(VERSION 3.30)
 
-project(cpp-tools C CXX)
+# -------------- APP_VERSION vcpkg.jso 에서 추출하여 생성하기 -----------------
+set(VCPKG_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json")
+file(READ "${VCPKG_MANIFEST}" VCPKG_JSON)
+foreach (KEY version version-semver version-date version-string)
+    string(JSON APP_VERSION ERROR_VARIABLE JSON_ERR GET "${VCPKG_JSON}" ${KEY})  # APP_VERSION 생성
+    if (NOT JSON_ERR)
+        break()
+    endif ()
+endforeach ()
+
+if (JSON_ERR)
+    message(FATAL_ERROR "vcpkg.json 에 버전 정보가 없음")
+endif ()
+
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*" APP_VERSION "${APP_VERSION}")   # 숫자 부분만 남김
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${VCPKG_MANIFEST}")
+message(STATUS "APP_VERSION = ${APP_VERSION}")
+# -------------- APP_VERSION -----------------
+
+project(cpp-tools VERSION ${APP_VERSION} LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # find package
 find_package(glm CONFIG REQUIRED)
-
 
 # header only library
 add_library(ctls INTERFACE)
