@@ -13,6 +13,7 @@
 
 // crpyt 관련
 #include "crypto/uuid.hpp"
+#include "crypto/object_id.hpp"
 
 // 디버그 도움 함수
 #include "debug/assert.hpp"
@@ -45,6 +46,3 @@
 
 // 기타 상수들
 #include "value/resolution.hpp"
-
-
-
