@@ -56,7 +56,8 @@ namespace ctls {
             }
 
             // time_point 는 언제나 1개 추가되고 시작되므로 항상 마지막 값이 들어 있다.
-            auto left = diff_milliseconds(_time_points.back(), _start_at);
+            auto left = _frame_budget - diff_milliseconds(_time_points.back(), _start_at);
+
             ILOG_TRACE(
                 "fps={:1f}, budget={:5f}ms, left={:5f}ms{}", _fps, _frame_budget, left,
                 log);
