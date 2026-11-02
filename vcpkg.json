@@ -1,6 +1,6 @@
 {
   "name": "cpp-tools",
-  "version-string": "0.0.33",
+  "version-string": "0.0.34",
   "dependencies": [
     "gtest",
     "glm"

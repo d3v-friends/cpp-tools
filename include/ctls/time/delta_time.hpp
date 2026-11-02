@@ -26,7 +26,7 @@ namespace ctls {
             IASSERT(0.0f < fps, "fps must be positive");
             std::scoped_lock lock(_mutex);
             _fps = fps;
-            _frame_budget = 1.0f / _fps;
+            _frame_budget = 1000.0f / _fps;
             _max_delta_time = _frame_budget * _margin_time_multiple;
         }
 

@@ -52,10 +52,14 @@ namespace ctls {
             get_all_unlocked(map);
             std::string log;
             for (const auto& [key, time] : map) {
-                log += std::format(", {}={:5f}", key, time);
+                log += std::format(", {}={:5f}ms", key, time);
             }
 
-            ILOG_TRACE("fps={:1f}, budget={:5f}{}", _fps, _frame_budget, log);
+            // time_point 는 언제나 1개 추가되고 시작되므로 항상 마지막 값이 들어 있다.
+            auto left = diff_milliseconds(*_time_points.end(), _start_at);
+            ILOG_TRACE(
+                "fps={:1f}, budget={:5f}ms, left=${:5f}ms,{}", _fps, _frame_budget, left,
+                log);
 
             _last_print_at = _start_at;
         }
@@ -68,7 +72,7 @@ namespace ctls {
         void set_fps(const float fps) {
             std::scoped_lock lock(_mutex);
             _fps = fps;
-            _frame_budget = 1.0f / _fps;
+            _frame_budget = 1000.0f / _fps;
         }
 
         void set_print_duration_milliseconds(const float duration) {
@@ -84,7 +88,7 @@ namespace ctls {
         std::vector<std::chrono::steady_clock::time_point> _time_points;
         float _duration = 3000.0f;
         float _fps = 60.0f;
-        float _frame_budget = 1.0f / _fps;
+        float _frame_budget = 1000.0f / _fps; // 밀리세컨드
 
         void get_all_unlocked(std::unordered_map<std::string, float>& out) const {
             int index = 0;
