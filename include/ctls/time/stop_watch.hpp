@@ -2,7 +2,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <mutex>
 #include <format>
 
@@ -48,7 +48,7 @@ namespace ctls {
                 return;
             }
 
-            std::unordered_map<std::string, float> map;
+            std::map<std::string, float> map;
             get_all_unlocked(map);
             std::string log;
             for (const auto& [key, time] : map) {
@@ -56,15 +56,15 @@ namespace ctls {
             }
 
             // time_point 는 언제나 1개 추가되고 시작되므로 항상 마지막 값이 들어 있다.
-            auto left = diff_milliseconds(*_time_points.end(), _start_at);
+            auto left = diff_milliseconds(_time_points.back(), _start_at);
             ILOG_TRACE(
-                "fps={:1f}, budget={:5f}ms, left=${:5f}ms,{}", _fps, _frame_budget, left,
+                "fps={:1f}, budget={:5f}ms, left={:5f}ms{}", _fps, _frame_budget, left,
                 log);
 
             _last_print_at = _start_at;
         }
 
-        void get_all(std::unordered_map<std::string, float>& out) const {
+        void get_all(std::map<std::string, float>& out) const {
             std::scoped_lock lock(_mutex);
             get_all_unlocked(out);
         }
@@ -90,7 +90,7 @@ namespace ctls {
         float _fps = 60.0f;
         float _frame_budget = 1000.0f / _fps; // 밀리세컨드
 
-        void get_all_unlocked(std::unordered_map<std::string, float>& out) const {
+        void get_all_unlocked(std::map<std::string, float>& out) const {
             int index = 0;
             for (const auto& key : _keys) {
                 out.emplace(
