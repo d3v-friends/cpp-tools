@@ -47,6 +47,25 @@ namespace ctls {
             return _timestamp;
         }
 
+        // 실패 정보를 그대로 꺼내서 다른 result/status 로 전파
+        [[nodiscard]] failed_result to_failed() const & {
+            // const 객체: 메세지 복사
+            return failed_result{
+                .message = _message,
+                .location = _location,
+                .timestamp = _timestamp,
+            };
+        }
+
+        [[nodiscard]] failed_result to_failed() && {
+            // std::move(r): 메세지 이동
+            return failed_result{
+                .message = std::move(_message),
+                .location = _location,
+                .timestamp = _timestamp,
+            };
+        }
+
     protected:
         std::source_location _location;
         std::chrono::system_clock::time_point _timestamp;
