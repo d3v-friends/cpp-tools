@@ -54,4 +54,6 @@ namespace ctls {
         bool _is_ok = true;
     };
 
+    inline status ok() noexcept { return status{}; }
+
 } // namespace ctls
