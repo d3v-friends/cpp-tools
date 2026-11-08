@@ -60,7 +60,7 @@ namespace ctls {
             to_string(level), thread_tag);
         std::format_to(std::back_inserter(message), fmt, std::forward<ARGS>(args)...);
         std::format_to(
-            std::back_inserter(message), "\t\t({} ({}))", filename, location.line());
+            std::back_inserter(message), "\t\t({}({}))", filename, location.line());
         print(message);
     }
 
