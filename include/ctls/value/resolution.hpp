@@ -1,9 +1,25 @@
 #pragma once
-#include <glm/glm.hpp>
 
 namespace ctls {
-    inline constexpr glm::ivec2 HD{1280, 720};
-    inline constexpr glm::ivec2 FHD{1920, 1080};
-    inline constexpr glm::ivec2 QHD{2560, 1440};
-    inline constexpr glm::ivec2 UHD{3840, 2160};
+    struct ivec2 {
+        int x;
+        int y;
+    };
+
+    inline constexpr ivec2 HD{
+        .x = 1280,
+        .y = 720,
+    };
+    inline constexpr ivec2 FHD{
+        .x = 1920,
+        .y = 1080,
+    };
+    inline constexpr ivec2 QHD{
+        .x = 2560,
+        .y = 1440,
+    };
+    inline constexpr ivec2 UHD{
+        .x = 3840,
+        .y = 2160,
+    };
 } // namespace ctls

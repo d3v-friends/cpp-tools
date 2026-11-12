@@ -1,8 +1,11 @@
 #pragma once
+#include <array>
+#include <chrono>
+#include <concepts>
+#include <memory>
+#include <source_location>
 #include <string>
 #include <utility>
-#include <source_location>
-#include <chrono>
 
 #include "failed_result.hpp"
 
@@ -14,14 +17,10 @@ namespace ctls {
         // 자동형변환 가능하게 만들기, 성공이면 {} 리턴가능
         status() noexcept = default;
 
-
-        //NOLINTNEXTLINE
-        status(failed_result f) : _location(f.location),
-                                  _timestamp(f.timestamp),
-                                  _message{std::move(f.message)},
-                                  _is_ok{false} {
-        }
-
+        // NOLINTNEXTLINE
+        status(failed_result f)
+            : _location(f.location), _timestamp(f.timestamp),
+              _message{std::move(f.message)}, _is_ok{false} {}
 
         status(const status&) = delete;
 
@@ -32,11 +31,19 @@ namespace ctls {
         status& operator=(status&&) = default;
 
         // 생성자 감추고 간결하게 함수화
-        static status ok() noexcept { return status{}; }
+        static status ok() noexcept {
+            return status{};
+        }
 
-        [[nodiscard]] explicit operator bool() const noexcept { return _is_ok; }
-        [[nodiscard]] bool is_ok() const noexcept { return _is_ok; }
-        [[nodiscard]] const std::string& get_message() const noexcept { return _message; }
+        [[nodiscard]] explicit operator bool() const noexcept {
+            return _is_ok;
+        }
+        [[nodiscard]] bool is_ok() const noexcept {
+            return _is_ok;
+        }
+        [[nodiscard]] const std::string& get_message() const noexcept {
+            return _message;
+        }
 
         [[nodiscard]] const std::source_location& get_location() const noexcept {
             return _location;
@@ -48,7 +55,7 @@ namespace ctls {
         }
 
         // 실패 정보를 그대로 꺼내서 다른 result/status 로 전파
-        [[nodiscard]] failed_result to_failed() const & {
+        [[nodiscard]] failed_result to_failed() const& {
             // const 객체: 메세지 복사
             return failed_result{
                 .message = _message,
@@ -66,13 +73,29 @@ namespace ctls {
             };
         }
 
+        // 체인 맨 끝에 before 를 붙인다 (이미 체인이 있으면 그 뒤에 붙음)
+        void append_chain(status before) {
+            auto tail = this;
+            while (tail->_chain) {
+                tail = tail->_chain.get();
+            }
+            tail->_chain = std::make_unique<status>(std::move(before));
+        }
+
+        [[nodiscard]] const status* get_chain() const noexcept {
+            return _chain.get();
+        }
+
     protected:
         std::source_location _location;
         std::chrono::system_clock::time_point _timestamp;
+        std::unique_ptr<status> _chain = nullptr; // 에러체인
         std::string _message;
         bool _is_ok = true;
     };
 
-    inline status ok() noexcept { return status{}; }
+    inline status ok() noexcept {
+        return status{};
+    }
 
 } // namespace ctls

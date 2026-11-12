@@ -1,13 +1,13 @@
 #pragma once
 #include <chrono>
-#include <string>
-#include <vector>
+#include <format>
 #include <map>
 #include <mutex>
-#include <format>
+#include <string>
+#include <vector>
 
-#include "diff.hpp"
 #include "ctls/debug/logger.hpp"
+#include "diff.hpp"
 
 namespace ctls {
     class stop_watch {
@@ -56,7 +56,8 @@ namespace ctls {
             }
 
             // time_point 는 언제나 1개 추가되고 시작되므로 항상 마지막 값이 들어 있다.
-            auto left = _frame_budget - diff_milliseconds(_time_points.back(), _start_at);
+            const auto left =
+                _frame_budget - diff_milliseconds(_time_points.back(), _start_at);
 
             ILOG_TRACE(
                 "fps={:1f}, budget={:5f}ms, left={:5f}ms{}", _fps, _frame_budget, left,

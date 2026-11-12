@@ -1,8 +1,16 @@
 {
   "name": "cpp-tools",
-  "version-string": "0.0.42",
+  "$package-name": "ctls",
+  "$cpp-version": "20",
+  "version-string": "0.0.43",
   "dependencies": [
-    "gtest",
-    "glm"
-  ]
+  ],
+  "features": {
+    "tests": {
+      "description": "gtest",
+      "dependencies": [
+        "gtest"
+      ]
+    }
+  }
 }

@@ -1,54 +1,34 @@
+// 자동 생성 파일 (generate_header)
 #pragma once
 
-// cast
-#include "cast/cast.hpp"
-#include "cast/enum.hpp"
-
-// concurrency
-#include "concurrency/channel.hpp"
-#include "concurrency/tps_channel.hpp"
-
-// container 관련
-#include "container/concurrency_vector.hpp"
-
-// crpyt 관련
-#include "crypto/uuid.hpp"
-#include "crypto/object_id.hpp"
-
-// 디버그 도움 함수
-#include "debug/assert.hpp"
-#include "debug/logger.hpp"
-#include "debug/p_logger.hpp"
-
-// 환경변수
+#include "ctls/cast/cast.hpp"
+#include "ctls/cast/enum.hpp"
+#include "ctls/concurrency/channel.hpp"
+#include "ctls/concurrency/tps_channel.hpp"
+#include "ctls/concurrency/types.hpp"
+#include "ctls/container/concurrency_vector.hpp"
+#include "ctls/crypto/object_id.hpp"
+#include "ctls/crypto/uuid.hpp"
+#include "ctls/debug/assert.hpp"
+#include "ctls/debug/logger.hpp"
+#include "ctls/debug/p_logger.hpp"
+#include "ctls/debug/types.hpp"
 #include "ctls/env/env.hpp"
-
-// 리턴, 에러 관리
 #include "ctls/error/error.hpp"
-#include "ctls/error/status.hpp"
-#include "ctls/error/result.hpp"
 #include "ctls/error/failed_result.hpp"
-
-// 파일 경로
-#include "filepath/filepath.hpp"
-
-// 로거
-#include "logger/logger.hpp"
-
-// string
-#include "string/string.hpp"
-#include "string/split.hpp"
-
-// thread 관련
-#include "thread/thread_task.hpp"
-#include "thread/thread_manager.hpp"
-#include "thread/wait.hpp"
-
-// time 관련 함수
-#include "time/diff.hpp"
-#include "time/delta_time.hpp"
-#include "time/stop_watch.hpp"
-#include "time/rfc3339.hpp"
-
-// 기타 상수들
-#include "value/resolution.hpp"
+#include "ctls/error/fn.hpp"
+#include "ctls/error/result.hpp"
+#include "ctls/error/status.hpp"
+#include "ctls/filepath/filepath.hpp"
+#include "ctls/logger/logger.hpp"
+#include "ctls/string/split.hpp"
+#include "ctls/string/string.hpp"
+#include "ctls/thread/thread_manager.hpp"
+#include "ctls/thread/thread_task.hpp"
+#include "ctls/thread/wait.hpp"
+#include "ctls/time/delta_time.hpp"
+#include "ctls/time/diff.hpp"
+#include "ctls/time/rfc3339.hpp"
+#include "ctls/time/stop_watch.hpp"
+#include "ctls/value/resolution.hpp"
+#include "ctls/win32/utf_8.hpp"

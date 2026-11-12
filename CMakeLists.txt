@@ -1,60 +1,85 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 4.1)
 
-# -------------- APP_VERSION vcpkg.jso 에서 추출하여 생성하기 -----------------
-set(VCPKG_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json")
-file(READ "${VCPKG_MANIFEST}" VCPKG_JSON)
-foreach (KEY version version-semver version-date version-string)
-    string(JSON APP_VERSION ERROR_VARIABLE JSON_ERR GET "${VCPKG_JSON}" ${KEY})  # APP_VERSION 생성
-    if (NOT JSON_ERR)
-        break()
-    endif ()
-endforeach ()
+# 미리 생성한 함수 가져오기
+include(cmake/functions.cmake)
 
-if (JSON_ERR)
-    message(FATAL_ERROR "vcpkg.json 에 버전 정보가 없음")
-endif ()
+# vcpkg.json 파일위치
+set(VCPKG_JSON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json")
 
-string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*" APP_VERSION "${APP_VERSION}")   # 숫자 부분만 남김
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${VCPKG_MANIFEST}")
-message(STATUS "APP_VERSION = ${APP_VERSION}")
-# -------------- APP_VERSION -----------------
+# vcpkg.json 에서 기본정보 가저오기
+get_json(VCPKG_NAME "name" FILE "${VCPKG_JSON_PATH}")
+get_json(APP_VERSION "version-string" FILE "${VCPKG_JSON_PATH}")
+get_json(PACKAGE_NAME "$package-name" FILE "${VCPKG_JSON_PATH}")
+get_json(CPP_VERSION "$cpp-version" FILE "${VCPKG_JSON_PATH}")
+is_available_cpp_version(${CPP_VERSION})
 
-project(cpp-tools VERSION ${APP_VERSION} LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 20)
+
+# 기본폴더 생성하기
+mkdir("${CMAKE_CURRENT_SOURCE_DIR}/include/${PACKAGE_NAME}")
+mkdir("${CMAKE_CURRENT_SOURCE_DIR}/source/${PACKAGE_NAME}")
+mkdir("${CMAKE_CURRENT_SOURCE_DIR}/source/app")
+mkdir("${CMAKE_CURRENT_SOURCE_DIR}/test/${PACKAGE_NAME}")
+
+# 기본값
+set(FILE_EXT "\\.(cpp|c|hpp|h)$")
+
+# 프로젝트 기본설정
+project(${VCPKG_NAME} VERSION ${APP_VERSION} LANGUAGES C CXX) # 프로젝트 이름 지정하기
+set(CMAKE_CXX_STANDARD ${CPP_VERSION})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# find package
-find_package(glm CONFIG REQUIRED)
+# 패키지 불러오기
+set(PACKAGES "")
+# vcpkg 에서 가저오기
+#find_package(glm CONFIG REQUIRED)
+#
+## 변수에 라이브러리 목록 추가하기
+#list(APPEND PACKAGES glm::glm)
+#
 
-# header only library
-add_library(ctls INTERFACE)
-add_library(ctls::ctls ALIAS ctls)
-
-# include path
-target_include_directories(ctls INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(ctls INTERFACE glm::glm)
-
-# 윈도우에서 난수함수 라이브러리 추가
-if (WIN32)
-    target_link_libraries(ctls INTERFACE bcrypt)
-    target_compile_definitions(ctls INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN)
-endif ()
-
-# 헤더파일 추가
-file(GLOB_RECURSE CTLS_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
-target_sources(
-        ctls INTERFACE FILE_SET
-        HEADERS BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        FILES ${CTLS_HEADERS}
+# 라이브러리 만들기
+# cmake 에서 이름을 한번 지정하면 전부 외부 노출이 된다.
+get_sources(
+        LIB_SOURCES
+        "${FILE_EXT}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/${PACKAGE_NAME}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/${PACKAGE_NAME}"
 )
-target_compile_features(ctls INTERFACE cxx_std_20)
+make_library(
+        LIB
+        LIB_NAME ${PACKAGE_NAME}
+        PACKAGES ${PACKAGES}
+        SOURCES ${LIB_SOURCES}
+)
+target_settings(${LIB})
 
+# version generate
+generate_version_file(
+        NAME ${PACKAGE_NAME}
+        TARGETS ${LIB} ${EXE}
+)
+
+# header generate
+generate_header(
+        OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/include/${PACKAGE_NAME}/${PACKAGE_NAME}.hpp"
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/${PACKAGE_NAME}"
+        BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
 
 
 # test
-option(CTLS_BUILD_TESTS "Build tests" ${PROJECT_IS_TOP_LEVEL})
-if (CTLS_BUILD_TESTS)
+# CMakeUserPresets.json 에서 관리한다
+# "cacheVariables": {
+#    "BUILD_TESTS": "ON"
+#  }
+option(BUILD_TESTS "테스트 빌드" OFF)
+if (BUILD_TESTS)
     enable_testing()
-    add_subdirectory(test)
+    run_test(
+            "${VCPKG_NAME}_test"
+            "${FILE_EXT}"
+            ${LIB}
+            "${CMAKE_CURRENT_SOURCE_DIR}/test"
+    )
 endif ()
-

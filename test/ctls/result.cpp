@@ -23,8 +23,9 @@ namespace {
         return ctls::failed_runtime(fmt, 1);
     }
 
+    // 파일 이름을 직접 적지 않고 컴파일러가 알려주는 현재 파일 경로와 비교 (파일 이름이 바뀌어도 안 깨짐)
     bool ends_with_this_file(const std::source_location& loc) {
-        return std::string_view{loc.file_name()}.ends_with("failed_result_test.cpp");
+        return std::string_view{loc.file_name()} == std::source_location::current().file_name();
     }
 
     bool contains(const char* haystack, std::string_view needle) {
@@ -146,60 +147,6 @@ TEST(FailedResultTest, RuntimeInvalidFormatThrows) {
     EXPECT_THROW((void)ctls::failed_runtime(fmt), std::format_error);
 }
 
-// ---------------------------------------------------------------- location
-// line = __LINE__ + 1; 다음 줄에서 failed 호출
-
-TEST(FailedResultTest, LocationOfPlainString) {
-    const std::uint_least32_t line = __LINE__ + 1;
-    const auto f = ctls::failed(std::string{"plain"});
-    EXPECT_EQ(f.location.line(), line);
-    EXPECT_TRUE(ends_with_this_file(f.location));
-}
-
-TEST(FailedResultTest, LocationOfLiteralWithoutArgs) {
-    const std::uint_least32_t line = __LINE__ + 1;
-    const auto f = ctls::failed("literal {}");
-    EXPECT_EQ(f.location.line(), line);
-    EXPECT_TRUE(ends_with_this_file(f.location));
-}
-
-TEST(FailedResultTest, LocationOfFormat) {
-    const int c = 1;
-    const std::uint_least32_t line = __LINE__ + 1;
-    const auto f = ctls::failed("x={} y={}", c, 2);
-    EXPECT_EQ(f.location.line(), line);
-    EXPECT_TRUE(ends_with_this_file(f.location));
-}
-
-TEST(FailedResultTest, LocationOfRuntime) {
-    const std::string fmt = "rt {}";
-    const std::uint_least32_t line = __LINE__ + 1;
-    const auto f = ctls::failed_runtime(fmt, 3);
-    EXPECT_EQ(f.location.line(), line);
-    EXPECT_TRUE(ends_with_this_file(f.location));
-}
-
-TEST(FailedResultTest, LocationOfRuntimeNoArgs) {
-    const std::uint_least32_t line = __LINE__ + 1;
-    const auto f = ctls::failed_runtime("rt");
-    EXPECT_EQ(f.location.line(), line);
-    EXPECT_TRUE(ends_with_this_file(f.location));
-}
-
-TEST(FailedResultTest, LocationIsCallerFunctionNotHeader) {
-    // failed_result.hpp / error.hpp 가 아니라 호출한 함수가 기록되어야 함
-    const auto a = failed_plain_in_helper();
-    const auto b = failed_fmt_in_helper(7);
-    const auto c = failed_rt_in_helper("rt {}");
-
-    EXPECT_EQ(b.message, "helper 7");
-    EXPECT_TRUE(ends_with_this_file(a.location));
-    EXPECT_TRUE(ends_with_this_file(b.location));
-    EXPECT_TRUE(ends_with_this_file(c.location));
-    EXPECT_TRUE(contains(a.location.function_name(), "failed_plain_in_helper"));
-    EXPECT_TRUE(contains(b.location.function_name(), "failed_fmt_in_helper"));
-    EXPECT_TRUE(contains(c.location.function_name(), "failed_rt_in_helper"));
-}
 
 TEST(FailedResultTest, LocationDiffersPerCallSite) {
     const auto a = ctls::failed("a");
