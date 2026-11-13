@@ -1,41 +1,71 @@
 #pragma once
-#include <string>
-#include <format>
-#include <utility>
-#include <type_traits>
-#include <optional>
 #include <concepts>
+#include <memory>
+#include <optional>
+#include <type_traits>
+#include <utility>
 
 #include "failed_result.hpp"
-#include "status.hpp"
 
 namespace ctls {
 
     // std::optional 처럼 작동하지만 에러나 날땐 메세지도 같이 전달
-    template <class T> class [[nodiscard]] result : public status {
+    template <class T> class [[nodiscard]] result {
     public:
         // explicit 안써야 자동 형변환 가능
         // NOLINTNEXTLINE
-        result(failed_result f) : status{std::move(f)} {
-        }
+        result(failed_result f)
+            : _failed{std::make_unique<failed_result>(std::move(f))} {}
 
         // T 로 암시적으로 변환되는 것을 모두 받아처리
         // explicit 을 안써줘야 자동 형변환 가능
         template <class U = T>
-            requires(std::convertible_to<U&&, T> &&
-                     !std::same_as<std::remove_cvref_t<U>, failed_result>)
+            requires(
+                std::convertible_to<U&&, T> &&
+                !std::same_as<std::remove_cvref_t<U>, failed_result>)
         // NOLINTNEXTLINE
-        result(U&& value) : status(), _value{std::in_place, std::forward<U>(value)} {
+        result(U&& value) : _value{std::in_place, std::forward<U>(value)} {}
+
+        // bool 판별식
+        [[nodiscard]] explicit operator bool() const noexcept {
+            return _value.has_value();
+        }
+
+        [[nodiscard]] bool has_value() const noexcept {
+            return _value.has_value();
+        }
+
+        failed_result* get_failed() {
+            if (_failed) {
+                return _failed.get();
+            }
+            return nullptr;
         }
 
         // operator, 값이없는데 값을 가져오려하면 UB
-        T& operator*() & { return *_value; }
-        const T& operator*() const & { return *_value; }
-        T&& operator*() && { return std::move(*_value); }
-        T* operator->() { return &*_value; }
-        const T* operator->() const { return &*_value; }
+        T& operator*() & {
+            return *_value;
+        }
+
+        const T& operator*() const& {
+            return *_value;
+        }
+
+        T operator*() && {
+            return std::move(*_value);
+        }
+
+        T* operator->() {
+            return &*_value;
+        }
+
+        const T* operator->() const {
+            return &*_value;
+        }
 
     protected:
         std::optional<T> _value;
+        std::unique_ptr<failed_result> _failed = nullptr;
     };
+
 } // namespace ctls
