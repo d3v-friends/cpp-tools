@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 
+#include "ctls/debug/assert.hpp"
 #include "error.hpp"
 
 namespace ctls {
@@ -74,4 +75,5 @@ namespace ctls {
 
         return out;
     }
+
 } // namespace ctls
