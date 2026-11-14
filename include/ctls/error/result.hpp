@@ -54,6 +54,11 @@ namespace ctls {
     // std::optional 처럼 작동하지만 에러나 날땐 메세지도 같이 전달
     template <class T = void> class [[nodiscard]] result : public result_base {
     public:
+        // NOLINTNEXTLINE
+        result(result_base&& base) : result_base(std::move(base)) {
+            IASSERT(_failed != nullptr, "propagate success result");
+        }
+
         // explicit 안써야 자동 형변환 가능
         // NOLINTNEXTLINE
         result(failed_result f) : result_base(std::move(f)) {}
@@ -114,6 +119,12 @@ namespace ctls {
     public:
         // 성공
         result() = default;
+
+        // result<void> 에도 같은 생성자 추가 (:125 아래)
+        // NOLINTNEXTLINE
+        result(result_base&& base) : result_base(std::move(base)) {
+            IASSERT(_failed != nullptr, "propagate success result");
+        }
 
         // NOLINTNEXTLINE
         result(ok_result) noexcept {}

@@ -7,6 +7,8 @@
 // - extract_failed 는 한 번만 호출 가능 (디버그 빌드에서 두 번째 호출은 IASSERT 로 abort)
 //   && 버전은 & 버전을 불러서 같은 검사를 쓴다. 릴리스(NDEBUG)에서는 검사 없음
 // - fails(result...) : result<T>/result<void> 여러 개에서 실패를 꺼내 입력 순서대로 체인으로 연결
+// - result(result_base&&) : 실패한 result 를 다른 타입 result 로 그대로 전파 (if (!cur) return cur;)
+//   성공한 result 를 넘기면 디버그 빌드에서 IASSERT("propagate success result") 로 abort
 #include <gtest/gtest.h>
 
 #include <ctls/error/result.hpp>
@@ -168,6 +170,81 @@ namespace {
         }
         return *a + 1;
     }
+
+    // ---- result(result_base&&) 전파 헬퍼 ----
+    // 실제 사용 형태: auto cur = query(...); if (!cur) { return cur; }
+    // C++20 에서는 return 변수; 가 먼저 rvalue 로 취급돼서 std::move 없이 전파 생성자가 선택됨
+
+    template <class... ARGS> ctls::result<int> query(bool good, ARGS&&... args) {
+        if (!good) {
+            return ctls::failed("query failed: {}", sizeof...(args));
+        }
+        return static_cast<int>(sizeof...(args));
+    }
+
+    // result<int> → result<std::string>
+    template <class... ARGS>
+    ctls::result<std::string> query_label(bool good, ARGS&&... args) {
+        auto cur = query(good, std::forward<ARGS>(args)...);
+        if (!cur) {
+            return cur;
+        }
+        return "rows=" + std::to_string(*cur);
+    }
+
+    // result<int> → result<void>
+    ctls::result<void> query_void(bool good) {
+        auto cur = query(good, 1);
+        if (!cur) {
+            return cur;
+        }
+        return ctls::ok;
+    }
+
+    // result<void> → result<int>
+    ctls::result<int> void_to_int(bool good) {
+        auto cur = load_b(good);
+        if (!cur) {
+            return cur;
+        }
+        return 100;
+    }
+
+    // result<void> → result<void> (같은 타입: 기존 move 생성자)
+    ctls::result<void> void_to_void(bool good) {
+        auto cur = load_b(good);
+        if (!cur) {
+            return cur;
+        }
+        return {};
+    }
+
+    // result<std::string> → result<std::unique_ptr<int>> (move-only 값 타입으로)
+    ctls::result<std::unique_ptr<int>> label_to_ptr(bool good) {
+        auto cur = query_label(good, 1, 2);
+        if (!cur) {
+            return cur;
+        }
+        return std::make_unique<int>(static_cast<int>(cur->size()));
+    }
+
+    // 여러 단계 전파: int → void → string
+    ctls::result<std::string> multi_hop(bool good) {
+        auto cur = query_void(good);
+        if (!cur) {
+            return cur;
+        }
+        return std::string{"ok"};
+    }
+
+    // 체인(fails) 이 있는 실패를 전파
+    ctls::result<std::string> chain_propagate() {
+        ctls::result<int> cur = ctls::fails(load_a(false), load_b(false));
+        if (!cur) {
+            return cur;
+        }
+        return std::string{"never"};
+    }
 } // namespace
 
 // result_tu2.cpp 에 정의 (inline constexpr ok 가 여러 cpp 에서 같이 쓰일 때 링크 확인)
@@ -319,6 +396,27 @@ static_assert(!can_fails<ctls::result<int>, ctls::failed_result>);
 // - const result: requires 는 통과하고 본문에서 extract_failed 를 못 찾아 컴파일 에러
 // static_assert(!can_fails<>);
 // static_assert(!can_fails<const ctls::result<int>&>);
+
+// result(result_base&&) : 다른 타입 result 의 rvalue 에서 생성 (암시적 변환 → return cur; 가능)
+static_assert(std::is_convertible_v<ctls::result<int>&&, ctls::result<std::string>>);
+static_assert(std::is_convertible_v<ctls::result<void>&&, ctls::result<int>>);
+static_assert(std::is_convertible_v<ctls::result<int>&&, ctls::result<void>>);
+static_assert(std::is_convertible_v<ctls::result<std::string>&&, ctls::result<void>>);
+static_assert(std::is_constructible_v<ctls::result<int>, ctls::result_base&&>);
+static_assert(std::is_constructible_v<ctls::result<void>, ctls::result_base&&>);
+// lvalue / const 는 받지 않음 → result<std::string> r = cur; 처럼 몰래 꺼내가는 것을 막음
+static_assert(!std::is_constructible_v<ctls::result<std::string>, ctls::result<int>&>);
+static_assert(!std::is_constructible_v<ctls::result<void>, ctls::result<int>&>);
+static_assert(!std::is_constructible_v<ctls::result<int>, ctls::result_base&>);
+static_assert(!std::is_constructible_v<ctls::result<std::string>, const ctls::result<int>&>);
+static_assert(!std::is_constructible_v<ctls::result<std::string>, const ctls::result<int>&&>);
+// 전파 생성자가 생겨도 같은 타입 복사는 여전히 금지, move 는 nothrow 유지
+static_assert(!std::is_copy_constructible_v<ctls::result<int>>);
+static_assert(!std::is_copy_constructible_v<ctls::result<void>>);
+static_assert(std::is_nothrow_move_constructible_v<ctls::result<int>>);
+// 값 변환 생성자와 섞이지 않음: result<int> 가 bool/int 값으로 바뀌어 들어가지 않음
+static_assert(!std::is_convertible_v<ctls::result<int>&&, bool>);
+static_assert(!std::is_convertible_v<ctls::result<int>&&, int>);
 
 // ==================== result<T> : 값 ====================
 
@@ -842,6 +940,144 @@ TEST(ResultFailsTest, PropagateFromFunction) {
     EXPECT_EQ(*good, 2);
 }
 
+// ==================== result(result_base&&) : return cur; 전파 ====================
+
+TEST(ResultPropagateTest, IntToStringWithForwardedArgs) {
+    auto good = query_label(true, 1, std::string{"a"}, 3.0);
+    ASSERT_TRUE(good);
+    EXPECT_EQ(*good, "rows=3");
+
+    auto bad = query_label(false, 1, 2);
+    ASSERT_FALSE(bad);
+    EXPECT_FALSE(bad.has_value());
+    EXPECT_EQ(bad.extract_failed().message, "query failed: 2");
+}
+
+TEST(ResultPropagateTest, IntToVoid) {
+    EXPECT_TRUE(query_void(true));
+
+    auto bad = query_void(false);
+    ASSERT_FALSE(bad);
+    EXPECT_EQ(bad.extract_failed().message, "query failed: 1");
+}
+
+TEST(ResultPropagateTest, VoidToInt) {
+    auto good = void_to_int(true);
+    ASSERT_TRUE(good);
+    EXPECT_EQ(*good, 100);
+
+    auto bad = void_to_int(false);
+    ASSERT_FALSE(bad);
+    EXPECT_FALSE(bad.has_value());
+    EXPECT_EQ(bad.extract_failed().message, "b failed");
+}
+
+TEST(ResultPropagateTest, VoidToVoidSameType) {
+    EXPECT_TRUE(void_to_void(true));
+
+    auto bad = void_to_void(false);
+    ASSERT_FALSE(bad);
+    EXPECT_EQ(bad.extract_failed().message, "b failed");
+}
+
+TEST(ResultPropagateTest, ToMoveOnlyValueType) {
+    auto good = label_to_ptr(true);
+    ASSERT_TRUE(good);
+    ASSERT_NE(*good, nullptr);
+    EXPECT_EQ(**good, 6); // "rows=2"
+
+    auto bad = label_to_ptr(false);
+    ASSERT_FALSE(bad);
+    EXPECT_EQ(bad.extract_failed().message, "query failed: 2");
+}
+
+TEST(ResultPropagateTest, MultiHop) {
+    auto good = multi_hop(true);
+    ASSERT_TRUE(good);
+    EXPECT_EQ(*good, "ok");
+
+    auto bad = multi_hop(false);
+    ASSERT_FALSE(bad);
+    EXPECT_EQ(bad.extract_failed().message, "query failed: 1");
+}
+
+TEST(ResultPropagateTest, KeepsOriginalLocation) {
+    // 위치는 전파한 곳이 아니라 처음 실패한 곳(query) 그대로
+    auto bad = query_label(false);
+    ASSERT_FALSE(bad);
+    const ctls::failed_result f = bad.extract_failed();
+    EXPECT_TRUE(is_this_file(f.location));
+    EXPECT_NE(
+        std::string_view{f.location.function_name()}.find("query"), std::string_view::npos);
+    EXPECT_EQ(
+        std::string_view{f.location.function_name()}.find("query_label"),
+        std::string_view::npos);
+}
+
+TEST(ResultPropagateTest, KeepsChain) {
+    auto bad = chain_propagate();
+    ASSERT_FALSE(bad);
+    EXPECT_EQ(
+        chain_messages(bad.extract_failed()),
+        (std::vector<std::string>{"a failed", "b failed"}));
+}
+
+TEST(ResultPropagateTest, ExplicitMoveConstruct) {
+    // return 이 아닌 곳에서는 std::move 로 명시해야 함
+    ctls::result<int> src = ctls::failed(std::string{"explicit"});
+    ctls::result<std::string> dst = std::move(src);
+    ASSERT_FALSE(dst);
+    EXPECT_EQ(dst.extract_failed().message, "explicit");
+}
+
+TEST(ResultPropagateTest, ThroughBaseRvalue) {
+    ctls::result<void> src = ctls::failed(std::string{"base"});
+    ctls::result_base& base = src;
+    ctls::result<int> dst = std::move(base);
+    ASSERT_FALSE(dst);
+    EXPECT_FALSE(dst.has_value());
+    EXPECT_EQ(dst.extract_failed().message, "base");
+}
+
+TEST(ResultPropagateTest, SourceIsEmptiedAfterPropagate) {
+    // 현재 구현 동작: _failed 포인터가 옮겨가 원본은 bool=true 가 된다.
+    // 전파한 원본은 다시 쓰면 안 된다는 기록으로 둠 (MoveFailedResultTransfersError 와 같은 동작)
+    ctls::result<int> src = ctls::failed(std::string{"gone"});
+    ctls::result<std::string> dst = std::move(src);
+    ASSERT_FALSE(dst);
+    EXPECT_TRUE(src); // NOLINT(bugprone-use-after-move)
+    EXPECT_FALSE(src.has_value());
+}
+
+TEST(ResultPropagateTest, AssignFromOtherTypeRvalue) {
+    // 대입도 임시 result 를 만들어 move 대입으로 동작
+    ctls::result<std::string> dst = std::string{"before"};
+    ctls::result<int> src = ctls::failed(std::string{"assign"});
+    dst = std::move(src);
+    ASSERT_FALSE(dst);
+    EXPECT_FALSE(dst.has_value());
+    EXPECT_EQ(dst.extract_failed().message, "assign");
+}
+
+TEST(ResultPropagateTest, PropagatedThenFails) {
+    // 전파받은 result 도 fails(result...) 에 그대로 넘길 수 있음
+    auto a = query_label(false, 1);
+    auto b = void_to_int(false);
+    const ctls::failed_result f = ctls::fails(a, b);
+    EXPECT_EQ(chain_messages(f), (std::vector<std::string>{"query failed: 1", "b failed"}));
+}
+
+#ifdef NDEBUG
+TEST(ResultPropagateTest, ReleaseDoesNotCheckSuccess) {
+    // 릴리스: IASSERT 가 사라져 성공 result 를 넘겨도 막지 않음 → bool=true 인데 값 없음.
+    // *r 는 UB 라 확인하지 않음. if (!cur) 확인을 빼먹으면 안 된다는 기록
+    ctls::result<int> good = 1;
+    ctls::result<std::string> r = std::move(good);
+    EXPECT_TRUE(r);
+    EXPECT_FALSE(r.has_value());
+}
+#endif
+
 // ==================== extract_failed 한 번만 ====================
 
 TEST(ExtractOnceTest, ReassignFailedAllowsExtractAgain) {
@@ -1044,6 +1280,34 @@ TEST(ResultFailsDeathTest, ExtractAfterFailsAborts) {
 TEST(ResultFailsDeathTest, SameResultTwiceAborts) {
     ctls::result<int> a = ctls::failed(std::string{"x"});
     EXPECT_DEATH({ auto f = ctls::fails(a, a); }, "");
+}
+
+// result(result_base&&) : 성공한 result 를 전파하면 abort (if (!cur) 확인을 빼먹은 경우)
+TEST(ResultPropagateDeathTest, SuccessToOtherTypeAborts) {
+    ctls::result<int> good = 1;
+    EXPECT_DEATH({ ctls::result<std::string> r = std::move(good); }, "");
+}
+
+TEST(ResultPropagateDeathTest, SuccessVoidToIntAborts) {
+    ctls::result<void> good;
+    EXPECT_DEATH({ ctls::result<int> r = std::move(good); }, "");
+}
+
+TEST(ResultPropagateDeathTest, SuccessIntToVoidAborts) {
+    ctls::result<int> good = 1;
+    EXPECT_DEATH({ ctls::result<void> r = std::move(good); }, "");
+}
+
+TEST(ResultPropagateDeathTest, ExtractedMarkTravels) {
+    // 꺼낸 뒤 전파하면 꺼냄 표시도 같이 넘어가서 받은 쪽에서 못 꺼냄
+    ctls::result<int> src = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto f = src.extract_failed();
+            ctls::result<std::string> dst = std::move(src);
+            auto g = dst.extract_failed();
+        },
+        "");
 }
 #endif
 
