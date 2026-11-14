@@ -15,13 +15,13 @@ namespace ctls {
 
         // NOLINTNEXTLINE(readability-make-member-function-const)
         failed_result extract_failed() && {
-            IASSERT(_failed != nullptr, "not failed result");
-            return std::move(*_failed);
+            return extract_failed();
         }
 
         // NOLINTNEXTLINE(readability-make-member-function-const)
         failed_result extract_failed() & {
             IASSERT(_failed != nullptr, "not failed result");
+            IASSERT(!std::exchange(_is_extracted, true), "failed already extracted");
             return std::move(*_failed);
         }
 
@@ -40,8 +40,9 @@ namespace ctls {
         result_base& operator=(result_base&&) = default;
 
         ~result_base() = default;
-        // 한번 호출하면 이동되어 삭제된다.에러가 없으면 UB
+
         std::unique_ptr<failed_result> _failed = nullptr;
+        bool _is_extracted = false;
     };
 
     // std::optional 처럼 작동하지만 에러나 날땐 메세지도 같이 전달
@@ -120,6 +121,6 @@ namespace ctls {
         result& operator=(result&&) = default;
     };
 
-    using void_result = result<>;
+    using result_void = result<>;
 
 } // namespace ctls

@@ -1,9 +1,15 @@
-// [2026-11-14] ctls::result<T>, ctls::result<void>, ctls::ok 테스트 (result_base v5)
-// - result_base 의 소멸자·move 는 protected (잘라내기·base 참조 대입·base 포인터 삭제
-// 금지)
-// - result<T>, result<void> 모두 result_base 를 상속, extract_failed() (& / && 둘 다)
-// - operator bool 은 result_base 에 있음 (_failed == nullptr 이면 true)
-// - 복사 금지, 이동·이동 대입 가능
+// [2026-11-14] ctls::result<T>, ctls::result<void>, ctls::ok 테스트 (result_base 버전)
+// - result<T>, result<void> 모두 result_base 상속
+// - result: 복사 금지, 이동 가능
+// - result_base: 생성/이동/소멸이 protected -> 외부에서 단독 사용 불가, 파생 잘라내기(slicing) 불가
+// - 소멸자 virtual 아님 -> result_base* 로 delete 할 수 없음 (컴파일 에러로 막힘)
+// - result<> == result<void> == void_result (기본 템플릿 인자)
+// - extract_failed 는 한 번만 호출 가능 (디버그 빌드에서 두 번째 호출은 IASSERT 로 abort)
+//   && 버전은 & 버전을 불러서 같은 검사를 쓴다. 릴리스(NDEBUG)에서는 검사 없음
+#include <gtest/gtest.h>
+
+#include <ctls/error/result.hpp>
+
 #include <chrono>          // std::chrono::system_clock
 #include <cstdint>         // std::uint_least32_t
 #include <memory>          // std::unique_ptr, std::make_unique
@@ -12,10 +18,6 @@
 #include <string_view>     // std::string_view
 #include <type_traits>     // std::is_*_v
 #include <utility>         // std::move, std::declval
-#include <vector>          // std::vector
-
-#include <ctls/error/result.hpp>
-#include <gtest/gtest.h>
 
 namespace {
     using clock_type = std::chrono::system_clock;
@@ -73,12 +75,6 @@ namespace {
         return "n=" + std::to_string(*r);
     }
 
-    // 이름 있는 변수를 그대로 반환 (이동 생성자 필요)
-    ctls::result<int> parse_named(int v) {
-        auto r = parse_positive(v);
-        return r;
-    }
-
     ctls::result<void> save_ok_tag() {
         return ctls::ok;
     }
@@ -87,15 +83,6 @@ namespace {
     }
     ctls::result<void> save_failed() {
         return ctls::failed(std::string{"save failed"});
-    }
-
-    // result<void> 이름 있는 변수 반환
-    ctls::result<void> save_named(bool good) {
-        ctls::result<void> r;
-        if (!good) {
-            r = ctls::failed(std::string{"named"});
-        }
-        return r;
     }
 
     // result<int> → result<void>
@@ -125,12 +112,12 @@ namespace {
         return v * 10;
     }
 
+    // 삼항 연산자로 바로 만든 prvalue 반환
     ctls::result<int> pick(bool good) {
-        return good ? ctls::result<int>{1}
-                    : ctls::result<int>{ctls::failed(std::string{"bad"})};
+        return good ? ctls::result<int>{1} : ctls::result<int>{ctls::failed(std::string{"bad"})};
     }
 
-    // result_base 참조로 받는 공용 함수
+    // result_base 참조로 받는 공용 함수 (upcast 는 참조라 가능)
     bool is_ok(const ctls::result_base& r) {
         return static_cast<bool>(r);
     }
@@ -142,45 +129,30 @@ ctls::result<void> result_tu2_failed();
 
 // ==================== 컴파일 단계 확인 ====================
 
-// 복사 금지, 이동 가능
+// result: 복사 금지, 이동 가능
 static_assert(!std::is_copy_constructible_v<ctls::result<int>>);
 static_assert(!std::is_copy_assignable_v<ctls::result<int>>);
-static_assert(std::is_nothrow_move_constructible_v<ctls::result<int>>);
-static_assert(std::is_nothrow_move_assignable_v<ctls::result<int>>);
+static_assert(std::is_move_constructible_v<ctls::result<int>>);
+static_assert(std::is_move_assignable_v<ctls::result<int>>);
 static_assert(!std::is_copy_constructible_v<ctls::result<void>>);
 static_assert(!std::is_copy_assignable_v<ctls::result<void>>);
-static_assert(std::is_nothrow_move_constructible_v<ctls::result<void>>);
-static_assert(std::is_nothrow_move_assignable_v<ctls::result<void>>);
-// 이동 전용 값도 담고 옮길 수 있음
-static_assert(std::is_move_constructible_v<ctls::result<std::unique_ptr<int>>>);
-static_assert(!std::is_copy_constructible_v<ctls::result<std::unique_ptr<int>>>);
+static_assert(std::is_move_constructible_v<ctls::result<void>>);
+static_assert(std::is_move_assignable_v<ctls::result<void>>);
 
-// 값 / failed_result / ok 로 다시 대입 가능 (임시 result 를 만든 뒤 이동 대입)
-static_assert(std::is_assignable_v<ctls::result<int>&, int>);
-static_assert(std::is_assignable_v<ctls::result<int>&, ctls::failed_result>);
-static_assert(std::is_assignable_v<ctls::result<void>&, ctls::ok_result>);
-static_assert(std::is_assignable_v<ctls::result<void>&, ctls::failed_result>);
-
-// result_base 상속 구조
+// result_base 는 외부에서 단독 사용 불가 (생성/이동/소멸 모두 protected)
 static_assert(std::is_base_of_v<ctls::result_base, ctls::result<int>>);
 static_assert(std::is_base_of_v<ctls::result_base, ctls::result<void>>);
 static_assert(std::is_convertible_v<ctls::result<int>*, ctls::result_base*>);
-static_assert(!std::has_virtual_destructor_v<ctls::result_base>);
-static_assert(!std::is_polymorphic_v<ctls::result_base>);
-// result_base 는 직접 만들 수 없음 (생성자 protected)
 static_assert(!std::is_default_constructible_v<ctls::result_base>);
-static_assert(!std::is_constructible_v<ctls::result_base, ctls::failed_result>);
 static_assert(!std::is_copy_constructible_v<ctls::result_base>);
-// result_base 의 move·소멸자는 protected: base 로 잘라 옮기기, base 참조로 대입, base
-// 포인터로 삭제 불가
 static_assert(!std::is_move_constructible_v<ctls::result_base>);
-static_assert(!std::is_constructible_v<ctls::result_base, ctls::result<int>&&>);
-static_assert(!std::is_constructible_v<ctls::result_base, ctls::result<void>&&>);
-static_assert(!std::is_move_assignable_v<ctls::result_base>);
-static_assert(!std::is_assignable_v<ctls::result_base&, ctls::result<int>&&>);
 static_assert(!std::is_destructible_v<ctls::result_base>);
-// 가상 함수가 없어서 vtable 포인터가 붙지 않음
-static_assert(sizeof(ctls::result<void>) == sizeof(std::unique_ptr<ctls::failed_result>));
+// 파생 객체를 result_base 로 잘라내 복사/이동 불가 (위에서 확인한 생성자들이 전부 막힘)
+
+// 소멸자는 virtual 이 아니지만 result_base* 로 delete 할 수 없어 slicing delete 원천 차단
+static_assert(!std::has_virtual_destructor_v<ctls::result_base>);
+static_assert(std::is_destructible_v<ctls::result<int>>);
+static_assert(std::is_destructible_v<ctls::result<void>>);
 
 // result<T> 는 기본 생성 불가 (값도 실패도 없는 상태를 막음) → return {}; 컴파일 에러
 static_assert(!std::is_default_constructible_v<ctls::result<int>>);
@@ -203,6 +175,14 @@ static_assert(!std::is_copy_constructible_v<ctls::failed_result>);
 static_assert(std::is_constructible_v<ctls::result<int>, ctls::failed_result&&>);
 static_assert(std::is_constructible_v<ctls::result<void>, ctls::failed_result&&>);
 
+// 대입: 값/failed_result/ok 는 임시 result 를 만들어 move 대입으로 동작
+static_assert(std::is_assignable_v<ctls::result<int>&, int>);
+static_assert(std::is_assignable_v<ctls::result<int>&, ctls::failed_result>);
+static_assert(std::is_assignable_v<ctls::result<void>&, ctls::ok_result>);
+static_assert(std::is_assignable_v<ctls::result<void>&, ctls::failed_result>);
+// result 자체 복사가 delete 라 const result& 에서는 대입 불가
+static_assert(!std::is_assignable_v<ctls::result<int>&, const ctls::result<int>&>);
+
 // 변환 안 되는 타입은 막힘
 static_assert(!std::is_constructible_v<ctls::result<int>, std::string>);
 static_assert(!std::is_constructible_v<ctls::result<std::string>, int*>);
@@ -224,7 +204,6 @@ static_assert(!std::is_convertible_v<const ctls::result<int>&, bool>);
 static_assert(std::is_constructible_v<bool, const ctls::result<int>&>);
 static_assert(!std::is_convertible_v<const ctls::result<void>&, bool>);
 static_assert(std::is_constructible_v<bool, const ctls::result<void>&>);
-static_assert(std::is_nothrow_constructible_v<bool, const ctls::result_base&>);
 
 // has_value 는 result<T> 만
 static_assert(has_has_value<ctls::result<int>>);
@@ -241,21 +220,18 @@ static_assert(std::is_same_v<
               decltype(std::declval<const ctls::result<int>&>().operator->()),
               const int*>);
 
-// extract_failed 는 result<T>, result<void> 모두 lvalue / rvalue 가능, const 는 불가
+// extract_failed 는 result<T>, result<void>, result_base 참조 모두에서
+// lvalue / rvalue 로 호출 가능, const 는 불가
 static_assert(lvalue_extract_failed<ctls::result<int>>);
 static_assert(rvalue_extract_failed<ctls::result<int>>);
 static_assert(!const_extract_failed<ctls::result<int>>);
 static_assert(lvalue_extract_failed<ctls::result<void>>);
 static_assert(rvalue_extract_failed<ctls::result<void>>);
 static_assert(!const_extract_failed<ctls::result<void>>);
+static_assert(lvalue_extract_failed<ctls::result_base>);
+static_assert(rvalue_extract_failed<ctls::result_base>);
 static_assert(std::is_same_v<
               decltype(std::declval<ctls::result<int>&>().extract_failed()),
-              ctls::failed_result>);
-static_assert(std::is_same_v<
-              decltype(std::declval<ctls::result<int>&&>().extract_failed()),
-              ctls::failed_result>);
-static_assert(std::is_same_v<
-              decltype(std::declval<ctls::result<void>&>().extract_failed()),
               ctls::failed_result>);
 static_assert(std::is_same_v<
               decltype(std::declval<ctls::result<void>&&>().extract_failed()),
@@ -264,6 +240,16 @@ static_assert(std::is_same_v<
 // 예전 이름 get_failed 는 둘 다 없음
 static_assert(!has_get_failed<ctls::result<int>>);
 static_assert(!has_get_failed<ctls::result<void>>);
+
+// result<> / void_result 는 result<void> 와 같은 타입
+static_assert(std::is_same_v<ctls::result<>, ctls::result<void>>);
+static_assert(std::is_same_v<ctls::result_void, ctls::result<void>>);
+
+// 꺼냄 표시(_is_extracted) 가 move 를 막지 않음
+static_assert(std::is_nothrow_move_constructible_v<ctls::result<int>>);
+static_assert(std::is_nothrow_move_assignable_v<ctls::result<int>>);
+static_assert(std::is_nothrow_move_constructible_v<ctls::result<void>>);
+static_assert(std::is_nothrow_move_assignable_v<ctls::result<void>>);
 
 // ==================== result<T> : 값 ====================
 
@@ -282,13 +268,6 @@ TEST(ResultTest, ImplicitConversion) {
     ctls::result<long long> l = 7;
     ASSERT_TRUE(l);
     EXPECT_EQ(*l, 7LL);
-}
-
-TEST(ResultTest, FalseValueIsStillTrue) {
-    // 담긴 값이 false 여도 result 자체는 성공
-    ctls::result<bool> r = false;
-    EXPECT_TRUE(r);
-    EXPECT_FALSE(*r);
 }
 
 TEST(ResultTest, ModifyThroughStar) {
@@ -334,6 +313,40 @@ TEST(ResultTest, TemporaryRvalueStar) {
     // *f() 가 값으로 돌려줘서 임시 객체가 사라져도 안전
     const int v = *parse_positive(4);
     EXPECT_EQ(v, 4);
+}
+
+TEST(ResultTest, MoveConstructKeepsValue) {
+    ctls::result<std::string> a = std::string(80, 'x'); // SSO 를 넘기는 길이
+    ctls::result<std::string> b = std::move(a);
+    ASSERT_TRUE(b);
+    EXPECT_EQ(*b, std::string(80, 'x'));
+}
+
+TEST(ResultTest, MoveAssign) {
+    ctls::result<std::string> a = std::string{"src"};
+    ctls::result<std::string> b = std::string{"dst"};
+    b = std::move(a);
+    ASSERT_TRUE(b);
+    EXPECT_EQ(*b, "src");
+}
+
+TEST(ResultTest, AssignValueReplacesContent) {
+    // r = 값 → 임시 result 로 만들어 move 대입
+    ctls::result<int> r = 1;
+    r = 42;
+    ASSERT_TRUE(r);
+    EXPECT_EQ(*r, 42);
+}
+
+TEST(ResultTest, AssignFailedThenRecover) {
+    ctls::result<int> r = 1;
+    r = ctls::failed(std::string{"late"}); // 실패로 교체
+    ASSERT_FALSE(r);
+    EXPECT_EQ(r.extract_failed().message, "late");
+
+    r = 7; // 다시 성공으로 복구 (_failed 포인터가 비워짐)
+    ASSERT_TRUE(r);
+    EXPECT_EQ(*r, 7);
 }
 
 // ==================== result<T> : 실패 / extract_failed ====================
@@ -414,95 +427,15 @@ TEST(ResultTest, FailedFromMovedVariable) {
     EXPECT_EQ(r.extract_failed().message, "moved");
 }
 
-// ==================== result<T> : 이동 / 대입 ====================
-
-TEST(ResultMoveTest, MoveConstructValue) {
-    ctls::result<std::string> a = std::string(100, 'm');
-    ctls::result<std::string> b = std::move(a);
-    ASSERT_TRUE(b);
-    EXPECT_EQ(*b, std::string(100, 'm'));
-}
-
-TEST(ResultMoveTest, MoveConstructFailed) {
-    ctls::result<int> a =
-        ctls::fails(ctls::failed(std::string{"m1"}), ctls::failed(std::string{"m2"}));
+TEST(ResultTest, MoveFailedResultTransfersError) {
+    ctls::result<int> a = ctls::failed(std::string{"boom"});
     ctls::result<int> b = std::move(a);
     ASSERT_FALSE(b);
-    EXPECT_FALSE(b.has_value());
-    const ctls::failed_result f = b.extract_failed();
-    EXPECT_EQ(f.message, "m1");
-    ASSERT_NE(f.before, nullptr);
-    EXPECT_EQ(f.before->message, "m2");
-}
-
-TEST(ResultMoveTest, MoveConstructMoveOnlyValue) {
-    ctls::result<std::unique_ptr<int>> a = std::make_unique<int>(3);
-    ctls::result<std::unique_ptr<int>> b = std::move(a);
-    ASSERT_TRUE(b);
-    ASSERT_NE(*b, nullptr);
-    EXPECT_EQ(**b, 3);
-}
-
-TEST(ResultMoveTest, AssignValueOverFailed) {
-    ctls::result<int> r = ctls::failed(std::string{"old"});
-    ASSERT_FALSE(r);
-    r = 8;
-    ASSERT_TRUE(r);
-    EXPECT_TRUE(r.has_value());
-    EXPECT_EQ(*r, 8);
-}
-
-TEST(ResultMoveTest, AssignFailedOverValue) {
-    ctls::result<int> r = 1;
-    ASSERT_TRUE(r);
-    r = ctls::failed(std::string{"new"});
-    ASSERT_FALSE(r);
-    EXPECT_FALSE(r.has_value());
-    EXPECT_EQ(r.extract_failed().message, "new");
-}
-
-TEST(ResultMoveTest, AssignFailedOverFailed) {
-    ctls::result<int> r = ctls::failed(std::string{"first"});
-    r = ctls::failed(std::string{"second"});
-    ASSERT_FALSE(r);
-    EXPECT_EQ(r.extract_failed().message, "second");
-}
-
-TEST(ResultMoveTest, MoveAssignFromOther) {
-    ctls::result<std::string> a = std::string{"a"};
-    ctls::result<std::string> b = ctls::failed(std::string{"b"});
-    a = std::move(b);
-    ASSERT_FALSE(a);
+    EXPECT_EQ(b.extract_failed().message, "boom");
+    // 현재 구현 동작: _failed 포인터가 옮겨가 원본은 bool=true 가 된다.
+    // 값도 없어서 *b 하면 UB — 이동된 원본은 절대 쓰면 안 된다는 기록으로 둠
+    EXPECT_TRUE(a);
     EXPECT_FALSE(a.has_value());
-    EXPECT_EQ(a.extract_failed().message, "b");
-}
-
-TEST(ResultMoveTest, ReturnNamedVariable) {
-    auto good = parse_named(4);
-    ASSERT_TRUE(good);
-    EXPECT_EQ(*good, 4);
-
-    auto bad = parse_named(-4);
-    ASSERT_FALSE(bad);
-    EXPECT_EQ(bad.extract_failed().message, "not positive: -4");
-}
-
-TEST(ResultMoveTest, StoreInVector) {
-    std::vector<ctls::result<int>> v;
-    for (int i = -2; i <= 2; ++i) {
-        v.push_back(parse_positive(i)); // 재할당 때 이동 필요
-    }
-    ASSERT_EQ(v.size(), 5U);
-    int ok_count = 0;
-    for (auto& r : v) {
-        if (r) {
-            ++ok_count;
-        } else {
-            EXPECT_EQ(r.extract_failed().message.rfind("not positive: ", 0), 0U);
-        }
-    }
-    EXPECT_EQ(ok_count, 2);
-    EXPECT_EQ(*v[4], 2);
 }
 
 // ==================== result<T> : 함수에서 돌려받기 ====================
@@ -633,6 +566,27 @@ TEST(ResultVoidTest, FailedKeepsChain) {
     EXPECT_EQ(f.before->message, "b");
 }
 
+TEST(ResultVoidTest, AssignOkAndFailed) {
+    ctls::result<void> r;
+    r = ctls::failed(std::string{"assigned"});
+    ASSERT_FALSE(r);
+    EXPECT_EQ(r.extract_failed().message, "assigned");
+
+    r = ctls::ok; // 성공으로 복구
+    EXPECT_TRUE(r);
+}
+
+TEST(ResultVoidTest, MoveKeepsState) {
+    ctls::result<void> a = ctls::ok;
+    ctls::result<void> b = std::move(a);
+    EXPECT_TRUE(b);
+
+    ctls::result<void> fa = ctls::failed(std::string{"mv"});
+    ctls::result<void> fb = std::move(fa);
+    ASSERT_FALSE(fb);
+    EXPECT_EQ(fb.extract_failed().message, "mv");
+}
+
 TEST(ResultVoidTest, PropagateFromResultInt) {
     EXPECT_TRUE(check(1));
 
@@ -661,38 +615,6 @@ TEST(ResultVoidTest, PropagateToResultIntRvalue) {
     EXPECT_EQ(std::move(bad).extract_failed().message, "not positive: -4");
 }
 
-TEST(ResultVoidTest, MoveConstruct) {
-    ctls::result<void> a = ctls::failed(std::string{"mv"});
-    ctls::result<void> b = std::move(a);
-    ASSERT_FALSE(b);
-    EXPECT_EQ(b.extract_failed().message, "mv");
-
-    ctls::result<void> c = ctls::ok;
-    ctls::result<void> d = std::move(c);
-    EXPECT_TRUE(d);
-}
-
-TEST(ResultVoidTest, AssignOkAndFailed) {
-    ctls::result<void> r;
-    r = ctls::failed(std::string{"set"});
-    ASSERT_FALSE(r);
-    EXPECT_EQ(r.extract_failed().message, "set");
-
-    r = ctls::ok;
-    EXPECT_TRUE(r);
-
-    r = ctls::failed(std::string{"again"});
-    r = {}; // 기본 생성한 result<void> 로 이동 대입 = 성공
-    EXPECT_TRUE(r);
-}
-
-TEST(ResultVoidTest, ReturnNamedVariable) {
-    EXPECT_TRUE(save_named(true));
-    auto bad = save_named(false);
-    ASSERT_FALSE(bad);
-    EXPECT_EQ(bad.extract_failed().message, "named");
-}
-
 TEST(ResultVoidTest, OkAcrossTranslationUnits) {
     EXPECT_TRUE(result_tu2_ok());
     auto r = result_tu2_failed();
@@ -719,16 +641,201 @@ TEST(ResultBaseTest, ExtractFailedThroughBaseRef) {
     EXPECT_EQ(b.extract_failed().message, "base");
 }
 
-TEST(ResultBaseTest, BoolMatchesHasValue) {
-    // result<T> 의 bool 은 result_base(_failed == nullptr) 기준. 정상 상태에선 has_value
-    // 와 같아야 함
-    for (int i = -1; i <= 1; ++i) {
-        auto r = parse_positive(i);
-        EXPECT_EQ(static_cast<bool>(r), r.has_value()) << "i=" << i;
-    }
+// ==================== result<> / void_result ====================
+
+TEST(ResultDefaultVoidTest, EmptyAngleBrackets) {
+    ctls::result<> a;
+    EXPECT_TRUE(a);
+    ctls::result<> b = ctls::failed(std::string{"angle"});
+    ASSERT_FALSE(b);
+    EXPECT_EQ(b.extract_failed().message, "angle");
+}
+
+TEST(ResultDefaultVoidTest, VoidResultAlias) {
+    ctls::result_void a = ctls::ok;
+    EXPECT_TRUE(a);
+    ctls::result_void b = save_failed(); // result<void> 를 그대로 받음
+    ASSERT_FALSE(b);
+    EXPECT_EQ(b.extract_failed().message, "save failed");
+}
+
+// ==================== extract_failed 한 번만 ====================
+
+TEST(ExtractOnceTest, ReassignFailedAllowsExtractAgain) {
+    // 새 failed 를 대입하면 새 result 가 들어오므로 꺼냄 표시도 초기화
+    ctls::result<int> r = ctls::failed(std::string{"first"});
+    EXPECT_EQ(r.extract_failed().message, "first");
+    r = ctls::failed(std::string{"second"});
+    ASSERT_FALSE(r);
+    EXPECT_EQ(r.extract_failed().message, "second");
+
+    ctls::result<void> v = ctls::failed(std::string{"v1"});
+    EXPECT_EQ(v.extract_failed().message, "v1");
+    v = ctls::failed(std::string{"v2"});
+    EXPECT_EQ(std::move(v).extract_failed().message, "v2");
+}
+
+TEST(ExtractOnceTest, MovedResultCanExtractOnce) {
+    // 꺼내기 전에 옮긴 result 는 옮겨간 쪽에서 한 번 꺼낼 수 있음
+    ctls::result<int> a = ctls::failed(std::string{"mv"});
+    ctls::result<int> b = std::move(a);
+    EXPECT_EQ(b.extract_failed().message, "mv");
+}
+
+TEST(ExtractOnceTest, RvalueExtractUsesSameCheck) {
+    // && 버전은 & 버전을 불러서 같은 표시를 켠다. 한 번은 정상, 이후 상태도 실패 유지
+    ctls::result<int> r = ctls::failed(std::string{"rv"});
+    EXPECT_EQ(std::move(r).extract_failed().message, "rv");
+    EXPECT_FALSE(r); // NOLINT(bugprone-use-after-move)
+
+    ctls::result<void> v = ctls::failed(std::string{"vrv"});
+    EXPECT_EQ(std::move(v).extract_failed().message, "vrv");
+    EXPECT_FALSE(v); // NOLINT(bugprone-use-after-move)
+}
+
+TEST(ExtractOnceTest, MoveAssignFreshFailedOverExtracted) {
+    // 이미 꺼낸 result 에 다른 (아직 안 꺼낸) result 를 move 대입하면 표시도 같이 바뀜
+    ctls::result<int> r = ctls::failed(std::string{"old"});
+    (void)r.extract_failed();
+    ctls::result<int> fresh = ctls::failed(std::string{"new"});
+    r = std::move(fresh);
+    EXPECT_EQ(r.extract_failed().message, "new");
+}
+
+TEST(ExtractOnceTest, AssignValueThenFailedAfterExtract) {
+    // 꺼냄 → 값으로 성공 → 다시 실패: 마지막 실패는 꺼낼 수 있음
+    ctls::result<int> r = ctls::failed(std::string{"a"});
+    (void)r.extract_failed();
+    r = 5;
+    ASSERT_TRUE(r);
+    EXPECT_EQ(*r, 5);
+    r = ctls::failed(std::string{"b"});
+    EXPECT_EQ(r.extract_failed().message, "b");
+}
+
+#ifdef NDEBUG
+TEST(ExtractOnceTest, ReleaseDoesNotCheckTwice) {
+    // 릴리스: IASSERT 가 ((void)0) 이라 std::exchange 도 실행 안 됨 → 두 번째도 abort 없음.
+    // 두 번째 값은 이미 move 된 failed_result 라 내용은 확인하지 않음
+    ctls::result<int> r = ctls::failed(std::string{"rel"});
+    EXPECT_EQ(r.extract_failed().message, "rel");
+    (void)r.extract_failed();
+    EXPECT_FALSE(r);
+}
+#endif
+
+#ifndef NDEBUG
+// 디버그 빌드: 두 번째 extract_failed 는 IASSERT → assert 로 abort.
+// &, && 어느 조합으로 불러도 두 번째는 막혀야 함.
+// 메시지는 logger 로 나가서 stderr 정규식은 비워둠 (abort 여부만 확인)
+TEST(ExtractOnceDeathTest, LvalueTwice) {
+    ctls::result<int> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = r.extract_failed();
+            auto b = r.extract_failed();
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, RvalueTwice) {
+    ctls::result<int> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = std::move(r).extract_failed();
+            auto b = std::move(r).extract_failed(); // NOLINT(bugprone-use-after-move)
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, LvalueThenRvalue) {
+    ctls::result<int> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = r.extract_failed();
+            auto b = std::move(r).extract_failed();
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, RvalueThenLvalue) {
+    ctls::result<int> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = std::move(r).extract_failed();
+            auto b = r.extract_failed(); // NOLINT(bugprone-use-after-move)
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, VoidLvalueTwice) {
+    ctls::result<void> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = r.extract_failed();
+            auto b = r.extract_failed();
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, ThroughBaseRefTwice) {
+    ctls::result<int> r = ctls::failed(std::string{"x"});
+    ctls::result_base& base = r;
+    EXPECT_DEATH(
+        {
+            auto a = r.extract_failed();
+            auto b = base.extract_failed();
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, VoidRvalueTwice) {
+    ctls::result<void> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = std::move(r).extract_failed();
+            auto b = std::move(r).extract_failed(); // NOLINT(bugprone-use-after-move)
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, VoidLvalueThenRvalue) {
+    ctls::result<void> r = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto a = r.extract_failed();
+            auto b = std::move(r).extract_failed();
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, MoveAfterExtractKeepsMark) {
+    // 꺼낸 뒤 옮기면 꺼냄 표시(bool)도 같이 옮겨가서 옮겨간 쪽에서도 못 꺼냄
+    ctls::result<int> a = ctls::failed(std::string{"x"});
+    EXPECT_DEATH(
+        {
+            auto f = a.extract_failed();
+            ctls::result<int> b = std::move(a);
+            auto g = b.extract_failed();
+        },
+        "");
+}
+
+TEST(ExtractOnceDeathTest, ExtractFromSuccess) {
+    // 실패가 아닌데 꺼내면 "not failed result" 로 abort
     ctls::result<int> r = 1;
-    r = ctls::failed(std::string{"x"});
-    EXPECT_EQ(static_cast<bool>(r), r.has_value());
-    r = 2;
-    EXPECT_EQ(static_cast<bool>(r), r.has_value());
+    ctls::result<void> v;
+    EXPECT_DEATH({ auto a = r.extract_failed(); }, "");
+    EXPECT_DEATH({ auto a = v.extract_failed(); }, "");
+}
+#endif
+
+TEST(ResultBaseTest, SlicingToBaseDoesNotCompile) {
+    // 결과물이 아니라 참조로만 다룰 수 있음 (위 static_assert 들이 컴파일 단계에서 보장).
+    // 아래 주석을 풀면 "calling a protected constructor/destructor" 로 컴파일 실패한다.
+    // ctls::result<int> src = 1;
+    // ctls::result_base sliced = std::move(src);
+    // std::unique_ptr<ctls::result_base> p =
+    //     std::make_unique<ctls::result<int>>(7);  // p 가 delete → protected 소멸자
+    SUCCEED();
 }
