@@ -8,14 +8,48 @@
 #include "failed_result.hpp"
 
 namespace ctls {
+    class result_base {
+    public:
+        result_base(const result_base&) = delete;
+        result_base& operator=(const result_base&) = delete;
+
+        // NOLINTNEXTLINE(readability-make-member-function-const)
+        failed_result extract_failed() && {
+            IASSERT(_failed != nullptr, "not failed result");
+            return std::move(*_failed);
+        }
+
+        // NOLINTNEXTLINE(readability-make-member-function-const)
+        failed_result extract_failed() & {
+            IASSERT(_failed != nullptr, "not failed result");
+            return std::move(*_failed);
+        }
+
+        [[nodiscard]] explicit operator bool() const noexcept {
+            return _failed == nullptr;
+        }
+
+    protected:
+        result_base() = default;
+
+        // NOLINTNEXTLINE
+        result_base(failed_result failed)
+            : _failed{std::make_unique<failed_result>(std::move(failed))} {}
+
+        result_base(result_base&&) = default;
+        result_base& operator=(result_base&&) = default;
+
+        ~result_base() = default;
+        // 한번 호출하면 이동되어 삭제된다.에러가 없으면 UB
+        std::unique_ptr<failed_result> _failed = nullptr;
+    };
 
     // std::optional 처럼 작동하지만 에러나 날땐 메세지도 같이 전달
-    template <class T> class [[nodiscard]] result {
+    template <class T = void> class [[nodiscard]] result : public result_base {
     public:
         // explicit 안써야 자동 형변환 가능
         // NOLINTNEXTLINE
-        result(failed_result f)
-            : _failed{std::make_unique<failed_result>(std::move(f))} {}
+        result(failed_result f) : result_base(std::move(f)) {}
 
         // T 로 암시적으로 변환되는 것을 모두 받아처리
         // explicit 을 안써줘야 자동 형변환 가능
@@ -31,19 +65,8 @@ namespace ctls {
         result(result&&) = default;
         result& operator=(result&&) = default;
 
-        // bool 판별식
-        [[nodiscard]] explicit operator bool() const noexcept {
-            return _value.has_value();
-        }
-
         [[nodiscard]] bool has_value() const noexcept {
             return _value.has_value();
-        }
-
-        // NOLINTNEXTLINE
-        failed_result get_failed() && {
-            IASSERT(_failed != nullptr, "not failed result");
-            return std::move(*_failed);
         }
 
         // operator, 값이없는데 값을 가져오려하면 UB
@@ -69,45 +92,34 @@ namespace ctls {
 
     protected:
         std::optional<T> _value;
-        std::unique_ptr<failed_result> _failed = nullptr;
     };
 
     // result<void> 특수화
     struct ok_result {
-        explicit constexpr ok_result() = default; // {} 가 ok_result 로 잘못 변환되는 걸 막음
+        explicit constexpr ok_result() =
+            default; // {} 가 ok_result 로 잘못 변환되는 걸 막음
     };
 
     inline constexpr ok_result ok{};
 
     // 값이 없는 결과. 성공은 return {}; 실패는 return failed(...);
-    template <> class [[nodiscard]] result<void> {
+    template <> class [[nodiscard]] result<void> : public result_base {
     public:
         // 성공
         result() = default;
 
+        // NOLINTNEXTLINE
         result(ok_result) noexcept {}
 
         // NOLINTNEXTLINE
-        result(failed_result f)
-            : _failed{std::make_unique<failed_result>(std::move(f))} {}
+        result(failed_result f) : result_base(std::move(f)) {}
 
         result(const result&) = delete;
         result& operator=(const result&) = delete;
         result(result&&) = default;
         result& operator=(result&&) = default;
-
-        [[nodiscard]] explicit operator bool() const noexcept {
-            return _failed == nullptr;
-        }
-
-        // NOLINTNEXTLINE
-        failed_result get_failed() && {
-            IASSERT(_failed != nullptr, "not failed result");
-            return std::move(*_failed);
-        }
-
-    protected:
-        std::unique_ptr<failed_result> _failed = nullptr;
     };
+
+    using void_result = result<>;
 
 } // namespace ctls
