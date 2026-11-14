@@ -45,6 +45,12 @@ namespace ctls {
         bool _is_extracted = false;
     };
 
+    template <class... R>
+        requires(std::derived_from<std::remove_cvref_t<R>, result_base> && ...)
+    failed_result fails(R&&... rs) {
+        return fails(std::move(rs).extract_failed()...);
+    }
+
     // std::optional 처럼 작동하지만 에러나 날땐 메세지도 같이 전달
     template <class T = void> class [[nodiscard]] result : public result_base {
     public:

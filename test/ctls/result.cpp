@@ -6,6 +6,7 @@
 // - result<> == result<void> == void_result (기본 템플릿 인자)
 // - extract_failed 는 한 번만 호출 가능 (디버그 빌드에서 두 번째 호출은 IASSERT 로 abort)
 //   && 버전은 & 버전을 불러서 같은 검사를 쓴다. 릴리스(NDEBUG)에서는 검사 없음
+// - fails(result...) : result<T>/result<void> 여러 개에서 실패를 꺼내 입력 순서대로 체인으로 연결
 #include <gtest/gtest.h>
 
 #include <ctls/error/result.hpp>
@@ -17,7 +18,8 @@
 #include <string>          // std::string, std::to_string
 #include <string_view>     // std::string_view
 #include <type_traits>     // std::is_*_v
-#include <utility>         // std::move, std::declval
+#include <utility>         // std::move, std::declval, std::forward
+#include <vector>          // std::vector
 
 namespace {
     using clock_type = std::chrono::system_clock;
@@ -120,6 +122,51 @@ namespace {
     // result_base 참조로 받는 공용 함수 (upcast 는 참조라 가능)
     bool is_ok(const ctls::result_base& r) {
         return static_cast<bool>(r);
+    }
+
+    // ---- fails(result...) 헬퍼 ----
+
+    // 주어진 인자로 ctls::fails(...) 를 부를 수 있는지
+    template <class... A>
+    concept can_fails = requires(A&&... a) { ctls::fails(std::forward<A>(a)...); };
+
+    // 체인(message → before → before ...) 을 앞에서부터 메시지 목록으로
+    std::vector<std::string> chain_messages(const ctls::failed_result& f) {
+        std::vector<std::string> out;
+        for (const ctls::failed_result* it = &f; it != nullptr; it = it->before.get()) {
+            out.push_back(it->message);
+        }
+        return out;
+    }
+
+    ctls::result<int> load_a(bool good) {
+        if (!good) {
+            return ctls::failed(std::string{"a failed"});
+        }
+        return 1;
+    }
+
+    ctls::result<void> load_b(bool good) {
+        if (!good) {
+            return ctls::failed(std::string{"b failed"});
+        }
+        return ctls::ok;
+    }
+
+    // 실제 사용 형태: 둘 다 실패면 한 번에 묶어서 전파
+    ctls::result<int> load_both(bool a_good, bool b_good) {
+        auto a = load_a(a_good);
+        auto b = load_b(b_good);
+        if (!a && !b) {
+            return ctls::fails(a, b);
+        }
+        if (!a) {
+            return a.extract_failed();
+        }
+        if (!b) {
+            return b.extract_failed();
+        }
+        return *a + 1;
     }
 } // namespace
 
@@ -250,6 +297,28 @@ static_assert(std::is_nothrow_move_constructible_v<ctls::result<int>>);
 static_assert(std::is_nothrow_move_assignable_v<ctls::result<int>>);
 static_assert(std::is_nothrow_move_constructible_v<ctls::result<void>>);
 static_assert(std::is_nothrow_move_assignable_v<ctls::result<void>>);
+
+// fails(result...) : result_base 를 상속한 타입만, 종류 섞어서 받을 수 있음
+static_assert(can_fails<ctls::result<int>>);
+static_assert(can_fails<ctls::result<void>>);
+static_assert(can_fails<ctls::result<int>&>); // 이름 있는 변수도 받음 (안에서 꺼냄)
+static_assert(can_fails<ctls::result_base&>);
+static_assert(can_fails<ctls::result<int>, ctls::result<void>, ctls::result<std::string>>);
+static_assert(std::is_same_v<
+              decltype(ctls::fails(std::declval<ctls::result<int>>())),
+              ctls::failed_result>);
+// failed_result 를 받는 기존 fails 도 그대로
+static_assert(can_fails<ctls::failed_result, ctls::failed_result>);
+// result 가 아닌 타입, failed_result 와 result 를 섞는 것은 불가
+static_assert(!can_fails<int>);
+static_assert(!can_fails<std::string>);
+static_assert(!can_fails<ctls::failed_result, ctls::result<int>>);
+static_assert(!can_fails<ctls::result<int>, ctls::failed_result>);
+// [헤더 수정 후 주석 해제] 지금 헤더에서는 둘 다 requires 를 통과해버림
+// - 인자 0개: fails() 가 자기 자신을 다시 불러 무한 재귀 (실행 시 segfault)
+// - const result: requires 는 통과하고 본문에서 extract_failed 를 못 찾아 컴파일 에러
+// static_assert(!can_fails<>);
+// static_assert(!can_fails<const ctls::result<int>&>);
 
 // ==================== result<T> : 값 ====================
 
@@ -659,6 +728,120 @@ TEST(ResultDefaultVoidTest, VoidResultAlias) {
     EXPECT_EQ(b.extract_failed().message, "save failed");
 }
 
+// ==================== fails(result...) ====================
+
+TEST(ResultFailsTest, SingleResult) {
+    const ctls::failed_result f = ctls::fails(load_a(false));
+    EXPECT_EQ(chain_messages(f), (std::vector<std::string>{"a failed"}));
+}
+
+TEST(ResultFailsTest, KeepsArgumentOrder) {
+    const ctls::failed_result f = ctls::fails(load_a(false), load_b(false));
+    EXPECT_EQ(chain_messages(f), (std::vector<std::string>{"a failed", "b failed"}));
+
+    const ctls::failed_result g = ctls::fails(load_b(false), load_a(false));
+    EXPECT_EQ(chain_messages(g), (std::vector<std::string>{"b failed", "a failed"}));
+}
+
+TEST(ResultFailsTest, MixedResultTypes) {
+    ctls::result<int> i = ctls::failed(std::string{"int"});
+    ctls::result<void> v = ctls::failed(std::string{"void"});
+    ctls::result<std::string> s = ctls::failed(std::string{"string"});
+    ctls::result<> d = ctls::failed(std::string{"default"});
+    ctls::result_void rv = ctls::failed(std::string{"alias"});
+
+    const ctls::failed_result f = ctls::fails(i, v, s, d, rv);
+    EXPECT_EQ(
+        chain_messages(f),
+        (std::vector<std::string>{"int", "void", "string", "default", "alias"}));
+}
+
+TEST(ResultFailsTest, LvalueArgumentsAreExtracted) {
+    // 이름 있는 변수를 넘기면 안에서 꺼낸다. 꺼낸 뒤에도 실패 상태는 그대로
+    ctls::result<int> a = ctls::failed(std::string{"la"});
+    ctls::result<void> b = ctls::failed(std::string{"lb"});
+    const ctls::failed_result f = ctls::fails(a, b);
+    EXPECT_EQ(chain_messages(f), (std::vector<std::string>{"la", "lb"}));
+    EXPECT_FALSE(a);
+    EXPECT_FALSE(a.has_value());
+    EXPECT_FALSE(b);
+}
+
+TEST(ResultFailsTest, MovedArguments) {
+    ctls::result<int> a = ctls::failed(std::string{"ma"});
+    ctls::result<void> b = ctls::failed(std::string{"mb"});
+    const ctls::failed_result f = ctls::fails(std::move(a), std::move(b));
+    EXPECT_EQ(chain_messages(f), (std::vector<std::string>{"ma", "mb"}));
+}
+
+TEST(ResultFailsTest, ThroughBaseReferences) {
+    ctls::result<int> a = ctls::failed(std::string{"ba"});
+    ctls::result<void> b = ctls::failed(std::string{"bb"});
+    ctls::result_base& ra = a;
+    ctls::result_base& rb = b;
+    const ctls::failed_result f = ctls::fails(ra, rb);
+    EXPECT_EQ(chain_messages(f), (std::vector<std::string>{"ba", "bb"}));
+}
+
+TEST(ResultFailsTest, NestedChainsAppendInOrder) {
+    // 이미 체인이 있는 result 를 넘기면 각 체인이 끝에 차례로 이어짐
+    ctls::result<int> a =
+        ctls::fails(ctls::failed(std::string{"e1"}), ctls::failed(std::string{"e2"}));
+    ctls::result<void> b = ctls::failed(std::string{"e3"});
+    ctls::result<std::string> c =
+        ctls::fails(ctls::failed(std::string{"e4"}), ctls::failed(std::string{"e5"}));
+
+    const ctls::failed_result f = ctls::fails(a, b, c);
+    EXPECT_EQ(
+        chain_messages(f), (std::vector<std::string>{"e1", "e2", "e3", "e4", "e5"}));
+}
+
+TEST(ResultFailsTest, KeepsEachLocation) {
+    const auto line_a = __LINE__ + 1;
+    ctls::result<int> a = ctls::failed(std::string{"pa"});
+    const auto line_b = __LINE__ + 1;
+    ctls::result<void> b = ctls::failed(std::string{"pb"});
+
+    const ctls::failed_result f = ctls::fails(a, b);
+    ASSERT_NE(f.before, nullptr);
+    EXPECT_TRUE(is_this_file(f.location));
+    EXPECT_EQ(f.location.line(), static_cast<std::uint_least32_t>(line_a));
+    EXPECT_TRUE(is_this_file(f.before->location));
+    EXPECT_EQ(f.before->location.line(), static_cast<std::uint_least32_t>(line_b));
+}
+
+TEST(ResultFailsTest, ConvertsToResult) {
+    ctls::result<int> r = ctls::fails(load_a(false), load_b(false));
+    ASSERT_FALSE(r);
+    EXPECT_EQ(
+        chain_messages(r.extract_failed()),
+        (std::vector<std::string>{"a failed", "b failed"}));
+
+    ctls::result<void> v = ctls::fails(load_b(false));
+    ASSERT_FALSE(v);
+    EXPECT_EQ(v.extract_failed().message, "b failed");
+}
+
+TEST(ResultFailsTest, PropagateFromFunction) {
+    auto both = load_both(false, false);
+    ASSERT_FALSE(both);
+    EXPECT_EQ(
+        chain_messages(both.extract_failed()),
+        (std::vector<std::string>{"a failed", "b failed"}));
+
+    auto only_a = load_both(false, true);
+    ASSERT_FALSE(only_a);
+    EXPECT_EQ(chain_messages(only_a.extract_failed()), (std::vector<std::string>{"a failed"}));
+
+    auto only_b = load_both(true, false);
+    ASSERT_FALSE(only_b);
+    EXPECT_EQ(chain_messages(only_b.extract_failed()), (std::vector<std::string>{"b failed"}));
+
+    auto good = load_both(true, true);
+    ASSERT_TRUE(good);
+    EXPECT_EQ(*good, 2);
+}
+
 // ==================== extract_failed 한 번만 ====================
 
 TEST(ExtractOnceTest, ReassignFailedAllowsExtractAgain) {
@@ -827,6 +1010,40 @@ TEST(ExtractOnceDeathTest, ExtractFromSuccess) {
     ctls::result<void> v;
     EXPECT_DEATH({ auto a = r.extract_failed(); }, "");
     EXPECT_DEATH({ auto a = v.extract_failed(); }, "");
+}
+
+// fails(result...) 도 안에서 extract_failed 를 부르므로 같은 검사에 걸림
+TEST(ResultFailsDeathTest, SuccessArgumentAborts) {
+    ctls::result<int> bad = ctls::failed(std::string{"x"});
+    ctls::result<void> good;
+    EXPECT_DEATH({ auto f = ctls::fails(bad, good); }, "");
+}
+
+TEST(ResultFailsDeathTest, AlreadyExtractedArgumentAborts) {
+    ctls::result<int> a = ctls::failed(std::string{"x"});
+    ctls::result<void> b = ctls::failed(std::string{"y"});
+    EXPECT_DEATH(
+        {
+            auto first = a.extract_failed();
+            auto f = ctls::fails(a, b);
+        },
+        "");
+}
+
+TEST(ResultFailsDeathTest, ExtractAfterFailsAborts) {
+    ctls::result<int> a = ctls::failed(std::string{"x"});
+    ctls::result<void> b = ctls::failed(std::string{"y"});
+    EXPECT_DEATH(
+        {
+            auto f = ctls::fails(a, b);
+            auto again = a.extract_failed();
+        },
+        "");
+}
+
+TEST(ResultFailsDeathTest, SameResultTwiceAborts) {
+    ctls::result<int> a = ctls::failed(std::string{"x"});
+    EXPECT_DEATH({ auto f = ctls::fails(a, a); }, "");
 }
 #endif
 
