@@ -13,6 +13,7 @@
 #include "ctls/debug/logger.hpp"
 #include "ctls/debug/p_logger.hpp"
 #include "ctls/debug/types.hpp"
+#include "ctls/enum.hpp"
 #include "ctls/env/env.hpp"
 #include "ctls/error/error.hpp"
 #include "ctls/error/failed_result.hpp"
