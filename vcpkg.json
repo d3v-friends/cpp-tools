@@ -2,7 +2,7 @@
   "name": "cpp-tools",
   "$package-name": "ctls",
   "$cpp-version": "20",
-  "version-string": "0.0.49",
+  "version-string": "0.0.50",
   "dependencies": [
   ],
   "features": {
