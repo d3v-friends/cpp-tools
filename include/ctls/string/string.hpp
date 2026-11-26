@@ -1,7 +1,10 @@
 #pragma once
-#include <optional>
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <charconv>
+#include <concepts>
+#include <optional>
 #include <string>
 
 namespace ctls {
@@ -9,7 +12,7 @@ namespace ctls {
         std::string digits;
         digits.reserve(str.size());
         for (const char c : str) {
-            if ('0' <= c && c <= '9' || c == '-') {
+            if (('0' <= c && c <= '9') || c == '-') {
                 digits.push_back(c);
             }
         }

@@ -9,6 +9,8 @@
 #include <string>
 #include <string_view>
 
+#include "ctls/error/result.hpp"
+
 namespace ctls {
 
     class object_id {
@@ -82,6 +84,16 @@ namespace ctls {
                 b[i] = static_cast<std::uint8_t>((hi << 4) | lo);
             }
             return object_id{b};
+        }
+
+        static result<> bind(std::string_view id, object_id& value) {
+            auto p = from_string(id);
+            if (!p) {
+                return failed("invalid object id: id={}", id);
+            }
+
+            value = *p;
+            return ok;
         }
 
         [[nodiscard]] std::chrono::sys_seconds timestamp() const {

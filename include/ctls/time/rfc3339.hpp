@@ -1,11 +1,12 @@
 #pragma once
-#include <chrono>
-#include <format>
-#include <string>
 #include <charconv>
-#include <optional>
-#include <string_view>
+#include <chrono>
 #include <ctime>
+#include <format>
+#include <optional>
+#include <string>
+#include <string_view>
+#include "ctls/error/result.hpp"
 
 namespace ctls {
     class rfc3339 {
@@ -13,14 +14,13 @@ namespace ctls {
         rfc3339()
             : _now{std::chrono::system_clock::now()},
               _string{std::format(
-                  "{:%FT%TZ}",
-                  std::chrono::floor<std::chrono::milliseconds>(_now))},
+                  "{:%FT%TZ}", std::chrono::floor<std::chrono::milliseconds>(_now))},
               _is_valid{true} {}
 
         explicit rfc3339(const std::chrono::system_clock::time_point now)
-            : _now{now}, _string{std::format(
-                             "{:%FT%TZ}",
-                             std::chrono::floor<std::chrono::milliseconds>(_now))},
+            : _now{now},
+              _string{std::format(
+                  "{:%FT%TZ}", std::chrono::floor<std::chrono::milliseconds>(_now))},
               _is_valid{true} {}
 
         explicit rfc3339(const std::string_view s) : _is_valid{false} {
@@ -39,6 +39,12 @@ namespace ctls {
         rfc3339& operator=(const rfc3339&) = default;
         rfc3339(rfc3339&&) = default;
         rfc3339& operator=(rfc3339&&) = default;
+
+        static result<> bind(const std::string& str, rfc3339& value) {
+            const auto p = from_string(str);
+            value = p;
+            return ok;
+        }
 
         // 함수를 실행한 시각 기준으로 남은 분
         // 양수: 기다려야 함, 0 이하: 이미 지남, nullopt: 무효 객체
@@ -91,7 +97,9 @@ namespace ctls {
             return std::format("{:%FT%T}", local); // 초 단위라 소수부 안 붙음
         }
 
-        static rfc3339 from_string(const std::string& str) { return rfc3339{str}; }
+        static rfc3339 from_string(const std::string& str) {
+            return rfc3339{str};
+        }
 
         [[nodiscard]] std::optional<std::string> string() const {
             if (!_is_valid) {
